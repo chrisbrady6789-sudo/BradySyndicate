@@ -1,0 +1,2301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brady Syndicate</title>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --navy: #0b1d35;
+            --navy-mid: #0f2444;
+            --navy-light: #1a3a6e;
+            --gold: #FFD700;
+            --gold-dark: #c9a800;
+            --green: #22c55e;
+            --green-dark: #15803d;
+            --red: #ef4444;
+            --red-dark: #b91c1c;
+            --amber: #f59e0b;
+            --card-bg: #ffffff;
+            --card-bg2: #f4f7fc;
+            --text: #1a2540;
+            --text-mid: #4a5568;
+            --text-light: #718096;
+            --border: #dce5f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(160deg, var(--navy) 0%, #112255 60%, #0b1d35 100%);
+            min-height: 100vh;
+            color: var(--text);
+        }
+
+        /* ── HEADER ── */
+        .header {
+            background: linear-gradient(135deg, #060f1e 0%, #0f2444 40%, #1a3a6e 70%, #0f2444 100%);
+            color: var(--gold);
+            padding: 22px 20px 16px;
+            text-align: center;
+            border-bottom: 2px solid rgba(255,215,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        .header::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 0%, rgba(255,215,0,0.07) 0%, transparent 65%);
+            pointer-events: none;
+        }
+        .header h1 {
+            font-size: 2.2em;
+            background: linear-gradient(135deg, #ffe566 0%, #fff 50%, #ffd700 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+        .header .subtitle { font-size: 0.95em; color: rgba(255,255,255,0.55); margin-top: 3px; }
+        .user-info {
+            position: absolute; top: 20px; right: 20px;
+            color: var(--gold); display: flex; align-items: center; gap: 10px; font-size: 0.88em;
+        }
+
+        /* ── NAV ── */
+        .nav {
+            background: #071022;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding: 0 10px;
+            display: flex;
+            justify-content: center;
+            gap: 2px;
+            flex-wrap: wrap;
+        }
+        .nav button {
+            position: relative;
+            background: transparent;
+            color: rgba(255,255,255,0.45);
+            border: none;
+            border-bottom: 3px solid transparent;
+            padding: 13px 18px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            font-size: 0.88em;
+            letter-spacing: 0.3px;
+        }
+        .nav button:hover { color: rgba(255,255,255,0.8); }
+        .nav button.active { color: var(--gold); border-bottom-color: var(--gold); }
+        .nav-badge {
+            position: absolute; top: 7px; right: 5px;
+            background: var(--red); color: #fff;
+            border-radius: 50%; width: 16px; height: 16px;
+            font-size: 0.62em; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none; line-height: 1;
+        }
+
+        /* ── LAYOUT ── */
+        .container { max-width: 1100px; margin: 24px auto; padding: 0 20px 40px; }
+        .hidden { display: none !important; }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+            border: 1px solid var(--border);
+        }
+        .card h2 {
+            color: var(--navy-mid);
+            border-bottom: 2px solid var(--gold);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+        }
+        .card h3 { color: var(--navy-mid); font-size: 1em; margin-bottom: 12px; }
+
+        /* ── BUTTONS ── */
+        .btn {
+            background: linear-gradient(135deg, var(--navy-light), var(--navy-mid));
+            color: #fff;
+            border: none;
+            padding: 10px 22px;
+            cursor: pointer;
+            border-radius: 7px;
+            font-weight: 600;
+            font-size: 0.93em;
+            transition: all 0.2s;
+        }
+        .btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; filter: none; }
+        .btn-gold { background: linear-gradient(135deg, var(--gold), #e6b800); color: #0b1d35; font-weight: 700; }
+        .btn-gold:hover { box-shadow: 0 4px 14px rgba(255,215,0,0.4); }
+        .btn-green { background: linear-gradient(135deg, var(--green), var(--green-dark)); }
+        .btn-red { background: linear-gradient(135deg, var(--red), var(--red-dark)); }
+        .btn-sm { padding: 5px 12px; font-size: 0.8em; }
+        .btn-ghost { background: none; border: 1.5px solid var(--border); color: var(--text-mid); }
+        .btn-ghost:hover { background: var(--card-bg2); filter: none; transform: none; }
+
+        /* ── FORMS ── */
+        .form-group { margin-bottom: 14px; }
+        .form-group label {
+            display: block; margin-bottom: 5px;
+            font-weight: 600; color: var(--navy-mid);
+            font-size: 0.82em; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 10px 12px;
+            border: 1.5px solid var(--border);
+            border-radius: 7px; font-size: 0.95em;
+            color: var(--text); background: #fff;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: var(--navy-light); outline: none;
+            box-shadow: 0 0 0 3px rgba(26,58,110,0.1);
+        }
+        .form-row { display: grid; gap: 12px; }
+        .form-row-2 { grid-template-columns: 1fr 1fr; }
+        .form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+        /* ── ALERTS ── */
+        .alert { padding: 11px 15px; border-radius: 7px; margin-bottom: 14px; font-weight: 600; font-size: 0.9em; }
+        .alert-error { background: #fff1f0; border: 1.5px solid #fca5a5; color: #b91c1c; }
+        .alert-success { background: #f0fdf4; border: 1.5px solid #86efac; color: #15803d; }
+        .alert-info { background: #eff6ff; border: 1.5px solid #93c5fd; color: #1d4ed8; }
+        .alert-warning { background: #fffbeb; border: 1.5px solid #fcd34d; color: #92400e; }
+
+        /* ── LOGIN ── */
+        .login-container { max-width: 400px; margin: 50px auto; }
+
+        /* ── DASHBOARD ── */
+        .dash-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+        .dash-stat {
+            background: var(--card-bg2);
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+        }
+        .dash-stat-val { font-size: 2em; font-weight: 900; color: var(--navy-mid); line-height: 1.1; }
+        .dash-stat-val.green { color: var(--green-dark); }
+        .dash-stat-val.red { color: var(--red-dark); }
+        .dash-stat-val.gold { color: var(--gold-dark); }
+        .dash-stat-label { font-size: 0.75em; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+        .week-info {
+            background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+            color: #fff;
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .week-info-left { font-size: 1em; }
+        .week-info-left strong { color: var(--gold); font-size: 1.1em; }
+        .week-info-right { font-size: 0.85em; opacity: 0.7; }
+
+        .free-bet-banner {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: #fff;
+            border-radius: 10px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .free-bet-icon { font-size: 1.8em; }
+        .free-bet-text strong { display: block; font-size: 1em; }
+        .free-bet-text span { font-size: 0.85em; opacity: 0.9; }
+
+        /* ── LEADERBOARD ── */
+        .lb-table { width: 100%; border-collapse: collapse; }
+        .lb-table th {
+            background: linear-gradient(135deg, var(--navy), var(--navy-mid));
+            color: #fff; padding: 10px 12px;
+            font-size: 0.78em; text-transform: uppercase;
+            letter-spacing: 0.5px; text-align: left;
+        }
+        .lb-table th:first-child { border-radius: 7px 0 0 0; }
+        .lb-table th:last-child { border-radius: 0 7px 0 0; }
+        .lb-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 0.93em; }
+        .lb-table tr:hover td { background: var(--card-bg2); }
+        .lb-table tr.me td { background: rgba(255,215,0,0.06); font-weight: 600; }
+        .lb-table tr.top td { background: rgba(255,215,0,0.1); }
+        .pos-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 26px; height: 26px; border-radius: 50%;
+            font-weight: 700; font-size: 0.85em;
+        }
+        .pos-1 { background: #ffd700; color: #0b1d35; }
+        .pos-2 { background: #e2e8f0; color: #1a2540; }
+        .pos-3 { background: #cd7f32; color: #fff; }
+        .pos-n { background: var(--card-bg2); color: var(--text-mid); }
+        .pnl-pos { color: var(--green-dark); font-weight: 700; }
+        .pnl-neg { color: var(--red-dark); font-weight: 700; }
+        .crown { font-size: 1.1em; }
+
+        /* ── BET CARDS ── */
+        .bet-card {
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+            background: var(--card-bg2);
+            transition: box-shadow 0.15s;
+        }
+        .bet-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.08); }
+        .bet-card.mine { border-color: var(--gold); background: rgba(255,215,0,0.04); }
+        .bet-card-top {
+            display: flex; align-items: flex-start;
+            justify-content: space-between; gap: 10px;
+            flex-wrap: wrap;
+        }
+        .bet-card-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+        .bet-selection { font-weight: 700; font-size: 1em; color: var(--navy-mid); flex: 1; min-width: 0; }
+        .bet-detail { font-size: 0.82em; color: var(--text-light); margin-top: 3px; }
+        .status-chip {
+            display: inline-block; padding: 3px 10px; border-radius: 20px;
+            font-size: 0.75em; font-weight: 700; white-space: nowrap;
+        }
+        .chip-pending  { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+        .chip-placed   { background: #eff6ff; border: 1px solid #93c5fd; color: #1d4ed8; }
+        .chip-won      { background: #f0fdf4; border: 1px solid #86efac; color: #15803d; }
+        .chip-lost     { background: #fff1f0; border: 1px solid #fca5a5; color: #b91c1c; }
+        .chip-void     { background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; }
+        .chip-freeBet  { background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; }
+        .chip-ew       { background: #f0f9ff; border: 1px solid #7dd3fc; color: #0369a1; }
+        .bet-user-tag  { font-weight: 700; color: var(--navy-mid); font-size: 0.85em; }
+        .bet-odds      { font-size: 0.9em; color: var(--text-mid); font-weight: 600; }
+        .bet-stake     { font-size: 0.82em; color: var(--text-light); }
+        .bet-actions   { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+        .big-odds-badge {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fff; font-size: 0.72em; font-weight: 700;
+            padding: 2px 7px; border-radius: 20px;
+        }
+        .copy-msg-box {
+            background: var(--navy);
+            color: #a0c4ff;
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-family: monospace;
+            font-size: 0.88em;
+            margin-top: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* ── QUEUE (admin) ── */
+        .queue-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+        .queue-tab {
+            padding: 6px 16px; border-radius: 20px; font-size: 0.83em;
+            font-weight: 600; cursor: pointer; border: 1.5px solid var(--border);
+            background: var(--card-bg2); color: var(--text-mid); transition: all 0.15s;
+        }
+        .queue-tab.active { background: var(--navy-mid); color: #fff; border-color: var(--navy-mid); }
+
+        /* ── FEED ── */
+        .feed-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+        .filter-chip {
+            padding: 5px 14px; border-radius: 20px; font-size: 0.82em;
+            font-weight: 600; cursor: pointer; border: 1.5px solid var(--border);
+            background: var(--card-bg2); color: var(--text-mid); transition: all 0.15s;
+        }
+        .filter-chip.active { background: var(--navy-mid); color: #fff; border-color: var(--navy-mid); }
+
+        /* ── STATS ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: var(--card-bg2);
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            padding: 14px;
+            text-align: center;
+        }
+        .stat-val { font-size: 1.6em; font-weight: 900; color: var(--navy-mid); }
+        .stat-label { font-size: 0.72em; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; }
+
+        /* ── SETUP BANNER ── */
+        .setup-banner {
+            background: linear-gradient(135deg, #1e3a5f, #0f2444);
+            border: 2px solid var(--gold);
+            border-radius: 12px;
+            padding: 20px 24px;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+        .setup-banner h3 { color: var(--gold); margin-bottom: 12px; font-size: 1em; }
+        .setup-step {
+            display: flex; align-items: flex-start; gap: 10px;
+            margin-bottom: 10px; font-size: 0.88em; opacity: 0.9;
+        }
+        .setup-step-num {
+            background: var(--gold); color: var(--navy);
+            width: 22px; height: 22px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.8em; flex-shrink: 0; margin-top: 1px;
+        }
+        .setup-banner code {
+            background: rgba(255,255,255,0.1);
+            padding: 2px 6px; border-radius: 4px;
+            font-family: monospace; font-size: 0.9em;
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 600px) {
+            .header h1 { font-size: 1.6em; }
+            .user-info { position: static; margin-top: 8px; justify-content: center; }
+            .form-row-2, .form-row-3 { grid-template-columns: 1fr; }
+            .lb-table th:nth-child(4),
+            .lb-table td:nth-child(4),
+            .lb-table th:nth-child(5),
+            .lb-table td:nth-child(5) { display: none; }
+        }
+
+        /* ── ACTIVITY WARNING ── */
+        .activity-warn {
+            background: #fff7ed;
+            border: 1.5px solid #fdba74;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.85em;
+            color: #9a3412;
+            margin-bottom: 12px;
+        }
+
+        /* ── MODAL ── */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.55);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; padding: 20px;
+        }
+        .modal-box {
+            background: #fff;
+            border-radius: 14px;
+            padding: 28px;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+            position: relative;
+        }
+        .modal-close {
+            position: absolute; top: 14px; right: 16px;
+            background: none; border: none; font-size: 1.4em;
+            cursor: pointer; color: var(--text-light);
+        }
+        .modal-title { font-size: 1.1em; font-weight: 700; color: var(--navy-mid); margin-bottom: 16px; }
+
+        /* ── WEEK BADGE ── */
+        .week-badge {
+            display: inline-block;
+            background: var(--navy);
+            color: var(--gold);
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 0.75em;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+
+        /* ── BET HISTORY TABLE ── */
+        .history-table { width: 100%; border-collapse: collapse; font-size: 0.88em; }
+        .history-table th {
+            background: linear-gradient(135deg, var(--navy), var(--navy-mid));
+            color: #fff; padding: 8px 10px;
+            font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.5px; text-align: left;
+        }
+        .history-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+        .history-table tr:hover td { background: var(--card-bg2); }
+    </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     HEADER
+══════════════════════════════════════ -->
+<div class="header">
+    <h1>🎯 Brady Syndicate</h1>
+    <div class="subtitle">Family Betting Tracker</div>
+    <div class="user-info" id="userInfo"></div>
+</div>
+
+<!-- NAV -->
+<div class="nav hidden" id="mainNav">
+    <button onclick="showPage('dashboard')" id="nav-dashboard">📊 Dashboard</button>
+    <button onclick="showPage('submit')"    id="nav-submit">➕ Submit Bet</button>
+    <button onclick="showPage('feed')"      id="nav-feed">📋 Feed</button>
+    <button onclick="showPage('leaderboard')" id="nav-leaderboard">🏆 Leaderboard</button>
+    <button onclick="showPage('queue')"     id="nav-queue" class="hidden">⏳ Queue</button>
+    <button onclick="showPage('admin')"     id="nav-admin">⚙️ Settings</button>
+</div>
+
+<!-- ══════════════════════════════════════
+     LOGIN
+══════════════════════════════════════ -->
+<div id="loginPage" class="container">
+    <div class="login-container">
+        <div class="card">
+            <h2>🎯 Brady Syndicate</h2>
+            <div id="loginMsg"></div>
+            <div class="form-group">
+                <label>Who are you?</label>
+                <select id="loginUser">
+                    <option value="">— Select your name —</option>
+                    <option>Keith</option><option>Fran</option><option>Shane</option>
+                    <option>Jack</option><option>Luke</option><option>Jason</option>
+                    <option>Liv</option><option>Chris</option><option>Liam</option><option>Paddy</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>PIN (4 digits)</label>
+                <input type="password" id="loginPin" maxlength="4" placeholder="••••" inputmode="numeric">
+            </div>
+            <button class="btn btn-gold" style="width:100%" onclick="doLogin()">Login</button>
+            <p style="margin-top:12px;font-size:0.8em;color:var(--text-light);text-align:center">
+                First time? Your default PIN is <strong>1234</strong> — change it in Admin.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SETUP INSTRUCTIONS (shown until Firebase is configured)
+══════════════════════════════════════ -->
+<div id="setupPage" class="container hidden">
+    <div class="setup-banner">
+        <h3>⚙️ One-time Setup Required</h3>
+        <div class="setup-step">
+            <div class="setup-step-num">1</div>
+            <div><strong>Create Firebase project</strong><br>Go to <a href="https://console.firebase.google.com" target="_blank" style="color:var(--gold)">console.firebase.google.com</a> → New Project → "brady-syndicate" → Add Web App → copy the config object</div>
+        </div>
+        <div class="setup-step">
+            <div class="setup-step-num">2</div>
+            <div><strong>Enable Realtime Database</strong><br>In Firebase console → Build → Realtime Database → Create Database → Start in test mode</div>
+        </div>
+        <div class="setup-step">
+            <div class="setup-step-num">3</div>
+            <div><strong>Paste your config</strong><br>Open this HTML file in a text editor, find the section labelled <code>PASTE FIREBASE CONFIG HERE</code> near the bottom and replace the placeholder object</div>
+        </div>
+        <div class="setup-step">
+            <div class="setup-step-num">4</div>
+            <div><strong>EmailJS (optional — for email notifications)</strong><br>Go to <a href="https://emailjs.com" target="_blank" style="color:var(--gold)">emailjs.com</a> → free account → create a service + template → paste your Service ID, Template ID, and Public Key into the <code>EMAILJS CONFIG</code> section</div>
+        </div>
+        <div class="setup-step">
+            <div class="setup-step-num">5</div>
+            <div><strong>Discord webhook (optional)</strong><br>In your Discord server → channel settings → Integrations → Webhooks → New Webhook → copy URL → paste into <code>DISCORD_WEBHOOK</code> below</div>
+        </div>
+        <div class="setup-step">
+            <div class="setup-step-num">6</div>
+            <div><strong>Enable Firebase Storage (for bet screenshots)</strong><br>Firebase console → Build → Storage → Get started → Start in test mode. Then update Storage Rules to:<br>
+            <code style="font-size:0.82em;display:block;margin-top:6px;background:rgba(0,0,0,0.15);padding:8px;border-radius:6px">rules_version = '2';<br>service firebase.storage {<br>&nbsp;&nbsp;match /b/{bucket}/o {<br>&nbsp;&nbsp;&nbsp;&nbsp;match /bet-screenshots/{allPaths=**} {<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;allow read, write: if true;<br>&nbsp;&nbsp;&nbsp;&nbsp;}<br>&nbsp;&nbsp;}<br>}</code></div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     DASHBOARD
+══════════════════════════════════════ -->
+<div id="dashboardPage" class="container hidden">
+
+    <div id="freeBetBanner" class="free-bet-banner hidden">
+        <div class="free-bet-icon">🎁</div>
+        <div class="free-bet-text">
+            <strong id="freeBetHolder"></strong>
+            <span>holds the free bet &amp; promos this week — top tipster from last week</span>
+        </div>
+    </div>
+
+    <div id="activityWarning" class="activity-warn hidden"></div>
+
+    <div class="week-info">
+        <div class="week-info-left">
+            <div style="font-size:0.8em;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px">Current Week</div>
+            <strong id="dashWeekLabel">—</strong>
+        </div>
+        <div class="week-info-right" id="dashWeekDates">—</div>
+    </div>
+
+    <div class="dash-grid" id="dashStats"></div>
+
+    <div class="card">
+        <h2>📋 Your Bets This Week</h2>
+        <div id="dashMyBets"></div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SUBMIT BET
+══════════════════════════════════════ -->
+<div id="submitPage" class="container hidden">
+    <div class="card">
+        <h2>➕ Submit a Bet Request</h2>
+        <div id="submitMsg"></div>
+
+        <div id="betBalanceInfo" style="margin-bottom:16px"></div>
+
+        <!-- Toggle: type OR screenshot -->
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button class="btn btn-sm" id="inputToggleText" onclick="setInputMode('text')" style="background:var(--navy-mid);color:#fff">✏️ Type selection</button>
+            <button class="btn btn-sm btn-ghost" id="inputTogglePhoto" onclick="setInputMode('photo')">📷 Upload screenshot</button>
+        </div>
+
+        <!-- Text input mode -->
+        <div id="inputModeText">
+            <div class="form-group">
+                <label>Selection (what you're betting on)</label>
+                <input type="text" id="betSelection" placeholder="e.g. Man City to win, Cheltenham 3:30 — Midnight Sun">
+            </div>
+        </div>
+
+        <!-- Screenshot mode -->
+        <div id="inputModePhoto" class="hidden">
+            <div class="form-group">
+                <label>Screenshot of your bet</label>
+                <div id="screenshotDropZone" onclick="document.getElementById('betScreenshot').click()"
+                    style="border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;cursor:pointer;background:var(--card-bg2);transition:border-color 0.2s">
+                    <div id="screenshotPreview" style="display:none;margin-bottom:10px">
+                        <img id="screenshotPreviewImg" style="max-width:100%;max-height:250px;border-radius:8px;object-fit:contain" alt="Screenshot preview">
+                    </div>
+                    <div id="screenshotDropText">
+                        <div style="font-size:2em;margin-bottom:8px">📷</div>
+                        <div style="font-weight:600;color:var(--text-mid)">Tap to attach screenshot</div>
+                        <div style="font-size:0.8em;color:var(--text-light);margin-top:4px">JPG, PNG or screenshot from camera roll</div>
+                    </div>
+                </div>
+                <input type="file" id="betScreenshot" accept="image/*" style="display:none" onchange="onScreenshotSelected(event)">
+            </div>
+            <div class="form-group">
+                <label>Description (optional but helpful for placers)</label>
+                <input type="text" id="betDescriptionPhoto" placeholder="e.g. 4-fold acca, each way, Cheltenham tips...">
+            </div>
+        </div>
+
+        <div class="form-row form-row-2">
+            <div class="form-group">
+                <label>Stake (€)</label>
+                <select id="betStake">
+                    <option value="5">€5 (1 bet)</option>
+                    <option value="10">€10 (2 bets)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Type</label>
+                <select id="betType">
+                    <option value="single">Single</option>
+                    <option value="ew">Each Way</option>
+                    <option value="freeBet">Free Bet</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Event / Race (optional)</label>
+            <input type="text" id="betEvent" placeholder="e.g. Premier League, Ascot 2:30">
+        </div>
+
+        <div class="form-group">
+            <label>Notes (optional)</label>
+            <input type="text" id="betNotes" placeholder="Any extra info for the placer">
+        </div>
+
+        <button class="btn btn-gold" style="margin-top:4px" onclick="submitBet()">Submit Bet Request</button>
+    </div>
+
+    <!-- Copy message appears here after submit -->
+    <div id="copyCard" class="card hidden">
+        <h2>📲 Send to WhatsApp</h2>
+        <p style="font-size:0.88em;color:var(--text-mid);margin-bottom:10px">Your bet is saved. Now send it to the group:</p>
+        <div class="copy-msg-box" id="copyMsgBox"></div>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+            <a id="waLink" href="#" target="_blank" class="btn btn-gold" style="text-decoration:none" onclick="onWaClick()">
+                📱 Open WhatsApp
+            </a>
+            <button class="btn btn-ghost" onclick="copyBetMsg()">📋 Copy text</button>
+            <button class="btn btn-ghost" onclick="document.getElementById('copyCard').classList.add('hidden')">Dismiss</button>
+        </div>
+        <p style="font-size:0.78em;color:var(--text-light);margin-top:8px">
+            Opens WhatsApp with the message ready — just pick the group and hit send.
+        </p>
+        <p id="copyConfirm" style="font-size:0.82em;color:var(--green-dark);margin-top:6px;font-weight:600"></p>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     FEED
+══════════════════════════════════════ -->
+<div id="feedPage" class="container hidden">
+    <div class="card">
+        <h2>📋 Bet Feed</h2>
+        <div class="feed-filter" id="feedFilter">
+            <div class="filter-chip active" onclick="setFeedFilter('week')" id="ff-week">This Week</div>
+            <div class="filter-chip" onclick="setFeedFilter('all')" id="ff-all">All Time</div>
+            <div class="filter-chip" onclick="setFeedFilter('mine')" id="ff-mine">Mine Only</div>
+            <div class="filter-chip" onclick="setFeedFilter('pending')" id="ff-pending">Pending</div>
+        </div>
+        <div id="feedContainer"></div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     LEADERBOARD
+══════════════════════════════════════ -->
+<div id="leaderboardPage" class="container hidden">
+
+    <div class="stats-grid" id="lbStats"></div>
+
+    <div class="card">
+        <h2>🏆 Leaderboard</h2>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-ghost" id="lbViewAll" onclick="setLbView('all')">All Time</button>
+            <button class="btn btn-sm" id="lbViewWeek" onclick="setLbView('week')" style="background:var(--navy-mid);color:#fff">This Week</button>
+        </div>
+        <div id="lbContainer"></div>
+    </div>
+
+    <div class="card">
+        <h2>📅 Weekly Winners</h2>
+        <div id="weeklyWinners"></div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     QUEUE (placers / admin)
+══════════════════════════════════════ -->
+<div id="queuePage" class="container hidden">
+    <div class="card">
+        <h2>⏳ Bet Queue</h2>
+        <div class="queue-tabs">
+            <div class="queue-tab active" onclick="setQueueTab('pending')" id="qt-pending">🟡 Pending</div>
+            <div class="queue-tab" onclick="setQueueTab('placed')"  id="qt-placed">🔵 Placed</div>
+            <div class="queue-tab" onclick="setQueueTab('settled')" id="qt-settled">✅ Settled</div>
+        </div>
+        <div id="queueContainer"></div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ADMIN
+══════════════════════════════════════ -->
+<div id="adminPage" class="container hidden">
+
+    <!-- ── Regular users: PIN change only ── -->
+    <div id="settingsUserCard" class="card hidden">
+        <h2>⚙️ My Settings</h2>
+        <h3 style="margin-bottom:12px">Change PIN</h3>
+        <div class="form-row form-row-2">
+            <div class="form-group">
+                <label>New PIN (4 digits)</label>
+                <input type="password" id="newPin" maxlength="4" inputmode="numeric" placeholder="••••">
+            </div>
+            <div class="form-group">
+                <label>Confirm PIN</label>
+                <input type="password" id="newPin2" maxlength="4" inputmode="numeric" placeholder="••••">
+            </div>
+        </div>
+        <button class="btn btn-gold" onclick="savePin()">Update PIN</button>
+        <div id="pinMsg" style="margin-top:8px"></div>
+    </div>
+
+    <!-- ── Admins: full panel ── -->
+    <div id="settingsAdminCard" class="card hidden">
+        <h2>⚙️ Admin Panel</h2>
+
+        <div class="queue-tabs" style="margin-bottom:20px" id="adminTabBar">
+            <div class="queue-tab active" onclick="showAdminTab('week')"   id="at-week">📅 Week</div>
+            <div class="queue-tab"        onclick="showAdminTab('users')"  id="at-users">👤 Users</div>
+            <div class="queue-tab"        onclick="showAdminTab('import')" id="at-import">📥 Import</div>
+            <div class="queue-tab"        onclick="showAdminTab('config')" id="at-config">🔧 Config</div>
+        </div>
+
+        <!-- Week tab -->
+        <div id="adminTab-week">
+            <h3>Current Week</h3>
+            <div id="adminWeekInfo" style="margin-bottom:16px"></div>
+            <button class="btn btn-gold" onclick="advanceWeek()">⏭ Advance to Next Week (Friday reset)</button>
+            <div id="adminWeekMsg" style="margin-top:10px"></div>
+
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <h3>Free Bet Holder</h3>
+            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:10px">Override who holds the PP free bet this week (normally auto-set to last week's top tipster)</p>
+            <div style="display:flex;gap:10px;align-items:end">
+                <div class="form-group" style="margin:0;flex:1">
+                    <select id="freeBetOverride">
+                        <option value="">— auto (last week's leader) —</option>
+                    </select>
+                </div>
+                <button class="btn btn-gold" onclick="saveFreeBetOverride()">Save</button>
+            </div>
+
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <h3>Add Bet Retroactively</h3>
+            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:14px">Enter a bet that was already placed — it won't deduct from the member's current balance.</p>
+            <div class="form-row form-row-2">
+                <div class="form-group">
+                    <label>Member</label>
+                    <select id="retroMember"></select>
+                </div>
+                <div class="form-group">
+                    <label>Week</label>
+                    <input type="number" id="retroWeek" min="1" placeholder="e.g. 26">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Selection / Description</label>
+                <input type="text" id="retroSelection" placeholder="e.g. Man City to win, 4-fold acca...">
+            </div>
+            <div class="form-row form-row-2">
+                <div class="form-group">
+                    <label>Stake (€)</label>
+                    <select id="retroStake">
+                        <option value="5">€5</option>
+                        <option value="10">€10</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="retroType">
+                        <option value="single">Single</option>
+                        <option value="ew">Each Way</option>
+                        <option value="freeBet">Free Bet</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row form-row-2">
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="retroStatus">
+                        <option value="placed">Placed (awaiting result)</option>
+                        <option value="won">Won ✅</option>
+                        <option value="lost">Lost ❌</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Odds</label>
+                    <input type="text" id="retroOdds" placeholder="e.g. 5/2">
+                </div>
+            </div>
+            <div class="form-group" id="retroReturnsGroup">
+                <label>Returns (€ total back incl. stake) — if won</label>
+                <input type="number" id="retroReturns" placeholder="e.g. 17.50" step="0.01" min="0">
+            </div>
+            <button class="btn btn-gold" onclick="addRetroBet()">➕ Add Bet</button>
+            <div id="retroMsg" style="margin-top:10px"></div>
+        </div>
+
+        <!-- Users tab -->
+        <div id="adminTab-users" class="hidden">
+            <h3>Member Balances</h3>
+            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:14px">View and manually adjust bet balances</p>
+            <div id="adminUsersTable"></div>
+        </div>
+
+        <!-- Import tab -->
+        <div id="adminTab-import" class="hidden">
+            <h3>Import Paddy Power CSV</h3>
+            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:12px">
+                Export your weekly bets from Paddy Power (My Bets → Export → CSV). The app will match each row against pending bets and settle them automatically.
+            </p>
+            <div class="form-group">
+                <label>Paste CSV content</label>
+                <textarea id="importCsvText" rows="8" placeholder="Paste the CSV content here..."></textarea>
+            </div>
+            <button class="btn btn-gold" onclick="importPpCsv()">Import &amp; Settle</button>
+            <div id="importMsg" style="margin-top:12px"></div>
+
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <h3>Import Historical Data (Excel / CSV)</h3>
+            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:12px">
+                Seed the leaderboard with past P&L. Paste a CSV with columns: <code>Name, Week, Selection, Odds, Stake, Result, Profit</code>
+            </p>
+            <div class="form-group">
+                <textarea id="importHistoryCsv" rows="6" placeholder="Name,Week,Selection,Odds,Stake,Result,Profit&#10;Keith,1,Man City Win,2/1,5,won,10&#10;..."></textarea>
+            </div>
+            <button class="btn" onclick="importHistory()">Import History</button>
+            <div id="importHistoryMsg" style="margin-top:10px"></div>
+
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <h3>Export Data Backup</h3>
+            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:12px">
+                Download a full snapshot of all Firebase data as a timestamped JSON file. Use this to manually back up or restore data.
+            </p>
+            <button class="btn btn-gold" onclick="exportData()">⬇ Export Full Data (JSON)</button>
+            <div id="exportMsg" style="margin-top:10px"></div>
+        </div>
+
+        <!-- Config tab -->
+        <div id="adminTab-config" class="hidden">
+            <h3>Syndicate Settings</h3>
+            <div class="form-row form-row-2">
+                <div class="form-group">
+                    <label>Week 1 start date (Friday)</label>
+                    <input type="date" id="cfgStartDate">
+                </div>
+                <div class="form-group">
+                    <label>Bets awarded per week</label>
+                    <input type="number" id="cfgBetsPerWeek" min="1" max="10" placeholder="2">
+                </div>
+            </div>
+            <button class="btn btn-gold" onclick="saveSyndicateSettings()">Save Settings</button>
+            <div id="cfgSettingsMsg" style="margin-top:10px"></div>
+
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <h3>Notification Config</h3>
+            <div class="form-group">
+                <label>Discord Webhook URL</label>
+                <input type="text" id="cfgDiscord" placeholder="https://discord.com/api/webhooks/...">
+            </div>
+            <div class="form-group">
+                <label>EmailJS Service ID</label>
+                <input type="text" id="cfgEmailService" placeholder="service_xxxxxxx">
+            </div>
+            <div class="form-group">
+                <label>EmailJS Template ID</label>
+                <input type="text" id="cfgEmailTemplate" placeholder="template_xxxxxxx">
+            </div>
+            <div class="form-group">
+                <label>EmailJS Public Key</label>
+                <input type="text" id="cfgEmailKey" placeholder="your_public_key">
+            </div>
+            <div class="form-group">
+                <label>Placer email addresses (comma separated)</label>
+                <input type="text" id="cfgPlacerEmails" placeholder="keith@example.com, fran@example.com">
+            </div>
+            <button class="btn btn-gold" onclick="saveConfig()">Save Config</button>
+            <div id="cfgMsg" style="margin-top:10px"></div>
+
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <h3>Screenshot Uploads (Cloudinary)</h3>
+            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:12px">Already configured — cloud name <code>dfbtotwyr</code>, preset <code>syndicate</code>. To change: update <code>CLOUDINARY_CLOUD</code> and <code>CLOUDINARY_PRESET</code> in the HTML source. Make sure the preset is set to <strong>Unsigned</strong> in your Cloudinary dashboard (Settings → Upload → Upload presets).</p>
+            <h3>Change PIN</h3>
+            <div class="form-row form-row-2">
+                <div class="form-group">
+                    <label>New PIN (4 digits)</label>
+                    <input type="password" id="newPinAdmin" maxlength="4" inputmode="numeric" placeholder="••••">
+                </div>
+                <div class="form-group">
+                    <label>Confirm PIN</label>
+                    <input type="password" id="newPin2Admin" maxlength="4" inputmode="numeric" placeholder="••••">
+                </div>
+            </div>
+            <button class="btn" onclick="savePin()">Update PIN</button>
+            <div id="pinMsg" style="margin-top:8px"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Mark Placed modal -->
+<div id="placedModal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closePlacedModal()">×</button>
+        <div class="modal-title">✅ Mark as Placed</div>
+        <div id="placedModalContent"></div>
+    </div>
+</div>
+
+<!-- Settle modal -->
+<div id="settleModal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeSettleModal()">×</button>
+        <div class="modal-title">🏁 Settle Bet</div>
+        <div id="settleModalContent"></div>
+    </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  ⚠️  PASTE FIREBASE CONFIG HERE
+//  Replace this object with your own from the Firebase console
+// ══════════════════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyA-aQsy-18gHjo0X0YLqbQLUZvYCew_zIc",
+    authDomain: "brady-syndicate.firebaseapp.com",
+    databaseURL: "https://brady-syndicate-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "brady-syndicate",
+    storageBucket: "brady-syndicate.firebasestorage.app",
+    messagingSenderId: "988565709944",
+    appId: "1:988565709944:web:dade24dde4e61713f7f98d",
+    measurementId: "G-5FEDJDSPV6"
+};
+
+// ══════════════════════════════════════════════════════════════
+//  DISCORD WEBHOOK  (paste your webhook URL here)
+// ══════════════════════════════════════════════════════════════
+let DISCORD_WEBHOOK = '';   // filled from Firebase config at runtime
+
+// ══════════════════════════════════════════════════════════════
+//  EMAILJS CONFIG  (filled from Firebase config at runtime)
+// ══════════════════════════════════════════════════════════════
+let EMAILJS_SERVICE  = '';
+let EMAILJS_TEMPLATE = '';
+let EMAILJS_KEY      = '';
+let PLACER_EMAILS    = [];
+
+// ══════════════════════════════════════════════════════════════
+//  CONSTANTS & MEMBERS
+// ══════════════════════════════════════════════════════════════
+const MEMBERS = ['Keith','Fran','Shane','Jack','Luke','Jason','Liv','Chris','Liam','Paddy'];
+const PLACERS = ['Chris','Fran','Jason'];  // access to queue + admin tools
+const ADMINS  = ['Chris','Fran','Jason'];  // same — all three are admins
+
+const BETS_PER_WEEK     = 2;   // bets awarded each Friday
+const BET_VALUE         = 5;   // € per bet
+const MAX_CARRY         = 4;   // max bets you can hold at once
+const BIG_ODDS_THRESHOLD = 10; // win at 10/1+ → earn bonus bet
+const INITIAL_BETS      = 4;   // each member starts with 4 bets (20€)
+const ACTIVITY_WEEKS    = 2;   // must place 1 bet every N weeks
+
+const CLOUDINARY_CLOUD  = 'dfbtotwyr';
+const CLOUDINARY_PRESET = 'syndicate';
+
+// ══════════════════════════════════════════════════════════════
+//  FIREBASE INIT
+// ══════════════════════════════════════════════════════════════
+const isConfigured = FIREBASE_CONFIG.apiKey !== 'PASTE_YOUR_API_KEY';
+
+let db = null;
+if (isConfigured) {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.database();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════
+let currentUser  = null;
+let isAdmin      = false;
+let isPlacer     = false;
+let currentPage  = 'dashboard';
+let appData      = { bets: {}, users: {}, weeks: {}, config: {} };
+let currentWeek  = 1;
+let lbView       = 'week';
+let queueTab     = 'pending';
+let feedFilter   = 'week';
+let adminTab     = 'week';
+let settlingBetId = null;
+let placingBetId  = null;
+
+// ══════════════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+    if (!isConfigured) {
+        document.getElementById('setupPage').classList.remove('hidden');
+        return;
+    }
+
+    const saved = sessionStorage.getItem('synUser');
+    if (saved) {
+        const u = JSON.parse(saved);
+        currentUser = u.name;
+        isAdmin  = ADMINS.includes(currentUser);
+        isPlacer = PLACERS.includes(currentUser);
+        startApp();
+    } else {
+        document.getElementById('loginPage').classList.remove('hidden');
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  AUTH
+// ══════════════════════════════════════════════════════════════
+async function doLogin() {
+    const name = document.getElementById('loginUser').value;
+    const pin  = document.getElementById('loginPin').value;
+    const msg  = document.getElementById('loginMsg');
+    msg.innerHTML = '';
+
+    if (!name) { msg.innerHTML = '<div class="alert alert-error">Please select your name.</div>'; return; }
+    if (!pin)  { msg.innerHTML = '<div class="alert alert-error">Please enter your PIN.</div>'; return; }
+
+    const snap = await db.ref('/users/' + name + '/pin').once('value');
+    const storedPin = snap.val();
+
+    // Default PIN is 1234 for new users
+    const expectedPin = storedPin || '1234';
+    if (pin !== expectedPin) {
+        msg.innerHTML = '<div class="alert alert-error">Incorrect PIN.</div>';
+        return;
+    }
+
+    currentUser = name;
+    isAdmin  = ADMINS.includes(name);
+    isPlacer = PLACERS.includes(name);
+    sessionStorage.setItem('synUser', JSON.stringify({ name }));
+    startApp();
+}
+
+function logout() {
+    sessionStorage.removeItem('synUser');
+    currentUser = null; isAdmin = false; isPlacer = false;
+    document.getElementById('loginPage').classList.remove('hidden');
+    document.getElementById('mainNav').classList.add('hidden');
+    ['dashboard','submit','feed','leaderboard','queue','admin'].forEach(p =>
+        document.getElementById(p + 'Page').classList.add('hidden')
+    );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  START APP — load data, wire listener
+// ══════════════════════════════════════════════════════════════
+function startApp() {
+    document.getElementById('loginPage').classList.add('hidden');
+    document.getElementById('mainNav').classList.remove('hidden');
+    document.getElementById('userInfo').innerHTML =
+        `<strong>${esc(currentUser)}</strong> <button class="btn btn-sm btn-gold" onclick="logout()">Logout</button>`;
+
+    if (isAdmin) {
+        document.getElementById('nav-queue').classList.remove('hidden');
+    }
+
+    // Populate free-bet override dropdown
+    const sel = document.getElementById('freeBetOverride');
+    MEMBERS.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o); });
+
+    db.ref('/').on('value', snap => {
+        const d = snap.val() || {};
+        appData.bets   = d.bets   || {};
+        appData.users  = d.users  || {};
+        appData.weeks  = d.weeks  || {};
+        appData.config = d.config || {};
+        currentWeek    = d.currentWeek || 1;
+
+        // Pull notification config from Firebase
+        if (appData.config.discordWebhook) DISCORD_WEBHOOK  = appData.config.discordWebhook;
+        if (appData.config.emailService)   EMAILJS_SERVICE  = appData.config.emailService;
+        if (appData.config.emailTemplate)  EMAILJS_TEMPLATE = appData.config.emailTemplate;
+        if (appData.config.emailKey)       EMAILJS_KEY      = appData.config.emailKey;
+        if (appData.config.placerEmails)   PLACER_EMAILS    = appData.config.placerEmails.split(',').map(e => e.trim());
+
+        // Seed users if needed
+        ensureUsers();
+        updateFeedBadge();
+        renderPage(currentPage);
+    });
+
+    showPage('dashboard');
+}
+
+async function ensureUsers() {
+    const updates = {};
+    for (const m of MEMBERS) {
+        if (!appData.users[m]) {
+            updates['/users/' + m + '/name']      = m;
+            updates['/users/' + m + '/betBalance'] = INITIAL_BETS;
+            updates['/users/' + m + '/totalPnl']  = 0;
+            updates['/users/' + m + '/betsPlaced'] = 0;
+            updates['/users/' + m + '/betsWon']   = 0;
+            updates['/users/' + m + '/lastBetWeek'] = 0;
+        }
+    }
+    if (Object.keys(updates).length) await db.ref('/').update(updates);
+    if (!appData.currentWeek) await db.ref('/currentWeek').set(1);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PAGE ROUTING
+// ══════════════════════════════════════════════════════════════
+const PAGES = ['dashboard','submit','feed','leaderboard','queue','admin'];
+
+function showPage(page) {
+    PAGES.forEach(p => {
+        const el = document.getElementById(p + 'Page');
+        const nav = document.getElementById('nav-' + p);
+        if (el) el.classList.add('hidden');
+        if (nav) nav.classList.remove('active');
+    });
+    document.getElementById(page + 'Page').classList.remove('hidden');
+    const navEl = document.getElementById('nav-' + page);
+    if (navEl) navEl.classList.add('active');
+    currentPage = page;
+    renderPage(page);
+}
+
+function renderPage(page) {
+    if (page === 'dashboard')   renderDashboard();
+    if (page === 'submit')      renderSubmit();
+    if (page === 'feed')        renderFeed();
+    if (page === 'leaderboard') renderLeaderboard();
+    if (page === 'queue')       renderQueue();
+    if (page === 'admin')       renderAdmin();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════════════════
+function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function slugify(s) { return String(s).toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,''); }
+function fmtEuro(n) { return (n >= 0 ? '+€' : '-€') + Math.abs(n).toFixed(2); }
+function fmtDate(ts) { return new Date(ts).toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }); }
+function weekLabel(w) { return `Week ${w}`; }
+
+function getWeekDates(weekNum) {
+    const base = appData.config?.startDate ? new Date(appData.config.startDate) : new Date('2026-06-20'); // Friday Week 26 starts
+    const start = new Date(base);
+    start.setDate(base.getDate() + (weekNum - 1) * 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const fmt = d => d.toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+    return `${fmt(start)} – ${fmt(end)}`;
+}
+
+function parseOddsToDecimal(oddsStr) {
+    if (!oddsStr) return null;
+    const s = String(oddsStr).trim();
+    // Fractional: 5/2, 10/1
+    if (s.includes('/')) {
+        const [n, d] = s.split('/').map(Number);
+        if (d) return n / d;
+    }
+    // Decimal: 3.5
+    const f = parseFloat(s);
+    if (!isNaN(f)) return f - 1; // convert decimal to fractional equivalent for threshold check
+    return null;
+}
+
+function isBigOdds(oddsStr) {
+    const f = parseOddsToDecimal(oddsStr);
+    return f !== null && f >= BIG_ODDS_THRESHOLD;
+}
+
+function getUserBets(user, week) {
+    return Object.values(appData.bets).filter(b => b.user === user && (week == null || b.week === week));
+}
+
+function getUserBalance(user) {
+    return (appData.users[user] && appData.users[user].betBalance != null)
+        ? appData.users[user].betBalance
+        : INITIAL_BETS;
+}
+
+function getWeeklyPnl(user, week) {
+    return getUserBets(user, week)
+        .filter(b => b.status === 'won' || b.status === 'lost')
+        .reduce((sum, b) => {
+            if (b.status === 'won') return sum + (parseFloat(b.profit) || 0);
+            return sum - (parseFloat(b.stake) || BET_VALUE);
+        }, 0);
+}
+
+function getAllTimePnl(user) {
+    return (appData.users[user] && appData.users[user].totalPnl != null)
+        ? appData.users[user].totalPnl
+        : 0;
+}
+
+function getWeekTopTipster(week) {
+    let best = null, bestPnl = -Infinity;
+    MEMBERS.forEach(m => {
+        const pnl = getWeeklyPnl(m, week);
+        if (pnl > bestPnl) { bestPnl = pnl; best = m; }
+    });
+    return best;
+}
+
+function getCurrentFreeBetHolder() {
+    if (appData.config.freeBetOverride) return appData.config.freeBetOverride;
+    if (currentWeek <= 1) return null;
+    return getWeekTopTipster(currentWeek - 1);
+}
+
+function statusChip(status) {
+    const labels = { pending: '🟡 Pending', placed: '🔵 Placed', won: '✅ Won', lost: '❌ Lost', void: '⬜ Void', freeBet: '🎁 Free Bet' };
+    return `<span class="status-chip chip-${status}">${labels[status] || status}</span>`;
+}
+
+function needsActivityWarning(user) {
+    if (currentWeek < ACTIVITY_WEEKS) return false;
+    for (let w = currentWeek - ACTIVITY_WEEKS + 1; w <= currentWeek; w++) {
+        const bets = getUserBets(user, w);
+        if (bets.length) return false;
+    }
+    return true;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════════════════════
+function renderDashboard() {
+    const balance = getUserBalance(currentUser);
+    const weekPnl = getWeeklyPnl(currentUser, currentWeek);
+    const allPnl  = getAllTimePnl(currentUser);
+    const myBets  = getUserBets(currentUser, currentWeek);
+
+    // Week info
+    document.getElementById('dashWeekLabel').textContent = weekLabel(currentWeek);
+    document.getElementById('dashWeekDates').textContent = getWeekDates(currentWeek);
+
+    // Free bet banner
+    const fbHolder = getCurrentFreeBetHolder();
+    if (fbHolder) {
+        document.getElementById('freeBetBanner').classList.remove('hidden');
+        document.getElementById('freeBetHolder').textContent = fbHolder;
+    }
+
+    // Activity warning
+    const warn = document.getElementById('activityWarning');
+    if (needsActivityWarning(currentUser)) {
+        warn.classList.remove('hidden');
+        warn.textContent = `⚠️ You haven't placed a bet in the last ${ACTIVITY_WEEKS} weeks. You'll lose a bet token if you don't place one this week.`;
+    } else {
+        warn.classList.add('hidden');
+    }
+
+    // Stat cards
+    const betsUsed = myBets.filter(b => b.status !== 'void').length;
+    document.getElementById('dashStats').innerHTML = `
+        <div class="dash-stat">
+            <div class="dash-stat-val">${balance}</div>
+            <div class="dash-stat-label">Bets Available</div>
+        </div>
+        <div class="dash-stat">
+            <div class="dash-stat-val">${betsUsed}</div>
+            <div class="dash-stat-label">Bets This Week</div>
+        </div>
+        <div class="dash-stat">
+            <div class="dash-stat-val ${weekPnl >= 0 ? 'green' : 'red'}">${fmtEuro(weekPnl)}</div>
+            <div class="dash-stat-label">Week P&L</div>
+        </div>
+        <div class="dash-stat">
+            <div class="dash-stat-val ${allPnl >= 0 ? 'green' : 'red'}">${fmtEuro(allPnl)}</div>
+            <div class="dash-stat-label">All-Time P&L</div>
+        </div>
+        <div class="dash-stat">
+            <div class="dash-stat-val gold">€${balance * BET_VALUE}</div>
+            <div class="dash-stat-label">Stake Value</div>
+        </div>
+    `;
+
+    // My bets this week
+    const el = document.getElementById('dashMyBets');
+    if (!myBets.length) {
+        el.innerHTML = '<p style="color:var(--text-light)">No bets submitted this week yet.</p>';
+    } else {
+        el.innerHTML = myBets.map(b => betCardHtml(b, false)).join('');
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUBMIT BET
+// ══════════════════════════════════════════════════════════════
+function renderSubmit() {
+    const balance = getUserBalance(currentUser);
+    const el = document.getElementById('betBalanceInfo');
+    const betsThisWeek = getUserBets(currentUser, currentWeek).filter(b => b.status !== 'void').length;
+    el.innerHTML = `
+        <div class="dash-stat" style="display:inline-block;text-align:left;padding:12px 16px;max-width:100%;background:var(--card-bg2);border:1.5px solid var(--border);border-radius:8px">
+            <span style="font-size:0.85em;color:var(--text-mid)">Balance: <strong>${balance} bets (€${balance * BET_VALUE})</strong> &nbsp;|&nbsp; Used this week: <strong>${betsThisWeek}</strong></span>
+        </div>`;
+    document.getElementById('submitMsg').innerHTML = '';
+    document.getElementById('copyCard').classList.add('hidden');
+    setInputMode('text');
+}
+
+let currentInputMode = 'text';
+
+function setInputMode(mode) {
+    currentInputMode = mode;
+    const isPhoto = mode === 'photo';
+    document.getElementById('inputModeText').classList.toggle('hidden', isPhoto);
+    document.getElementById('inputModePhoto').classList.toggle('hidden', !isPhoto);
+    const btnText  = document.getElementById('inputToggleText');
+    const btnPhoto = document.getElementById('inputTogglePhoto');
+    if (btnText && btnPhoto) {
+        btnText.style.background  = isPhoto ? '' : 'var(--navy-mid)';
+        btnText.style.color       = isPhoto ? '' : '#fff';
+        btnText.className         = isPhoto ? 'btn btn-sm btn-ghost' : 'btn btn-sm';
+        btnPhoto.style.background = isPhoto ? 'var(--navy-mid)' : '';
+        btnPhoto.style.color      = isPhoto ? '#fff' : '';
+        btnPhoto.className        = isPhoto ? 'btn btn-sm' : 'btn btn-sm btn-ghost';
+    }
+}
+
+function onScreenshotSelected(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById('screenshotPreviewImg').src = e.target.result;
+        document.getElementById('screenshotPreview').style.display = '';
+        document.getElementById('screenshotDropText').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+}
+
+async function deleteScreenshot(bet) {
+    if (!bet.screenshotUrl) return;
+    // Actual Cloudinary deletion requires server-side API secret — do manual cleanup in Cloudinary Media Library (syndicate/ folder)
+    try {
+        await db.ref(`/bets/${bet.id}/screenshotUrl`).remove();
+        await db.ref(`/bets/${bet.id}/screenshotPublicId`).remove();
+        await db.ref(`/bets/${bet.id}/hasScreenshot`).remove();
+    } catch (_) {}
+}
+
+async function submitBet() {
+    const mode       = currentInputMode || 'text';
+    const stake      = parseFloat(document.getElementById('betStake').value);
+    const type       = document.getElementById('betType').value;
+    const event      = document.getElementById('betEvent').value.trim();
+    const notes      = document.getElementById('betNotes').value.trim();
+    const msg        = document.getElementById('submitMsg');
+
+    msg.innerHTML = '';
+
+    let selection    = '';
+    let screenshotFile = null;
+
+    if (mode === 'text') {
+        selection = document.getElementById('betSelection').value.trim();
+        if (!selection) { msg.innerHTML = '<div class="alert alert-error">Please enter the selection.</div>'; return; }
+    } else {
+        screenshotFile = document.getElementById('betScreenshot').files[0];
+        if (!screenshotFile) { msg.innerHTML = '<div class="alert alert-error">Please attach a screenshot.</div>'; return; }
+        selection = document.getElementById('betDescriptionPhoto').value.trim() || '(screenshot)';
+    }
+
+    const balance    = getUserBalance(currentUser);
+    const betsNeeded = stake / BET_VALUE;
+
+    if (type !== 'freeBet' && balance < betsNeeded) {
+        msg.innerHTML = `<div class="alert alert-error">Not enough bets! You have ${balance} bet(s) but need ${betsNeeded}.</div>`;
+        return;
+    }
+
+    msg.innerHTML = '<div class="alert" style="background:var(--card-bg2);color:var(--text-mid)">Submitting…</div>';
+
+    const betId = db.ref('/bets').push().key;
+    let screenshotUrl      = null;
+    let screenshotPublicId = null;
+
+    // Upload screenshot to Cloudinary if provided
+    if (screenshotFile) {
+        try {
+            const formData = new FormData();
+            formData.append('file', screenshotFile);
+            formData.append('upload_preset', CLOUDINARY_PRESET);
+            formData.append('folder', 'syndicate');
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            if (!res.ok) throw new Error('Upload failed');
+            const data = await res.json();
+            screenshotUrl = data.secure_url;
+            screenshotPublicId = data.public_id;
+        } catch (e) {
+            msg.innerHTML = `<div class="alert alert-error">Screenshot upload failed: ${e.message}</div>`;
+            return;
+        }
+    }
+
+    const bet = {
+        id: betId,
+        user: currentUser,
+        selection,
+        stake,
+        type,
+        event,
+        notes,
+        status: 'pending',
+        week: currentWeek,
+        submittedAt: Date.now(),
+        profit: null,
+        ...(screenshotUrl ? { screenshotUrl, screenshotPublicId, hasScreenshot: true } : {})
+    };
+
+    // Deduct bets immediately (optimistic — refunded if void)
+    const newBalance = type === 'freeBet' ? balance : Math.max(0, balance - betsNeeded);
+
+    await Promise.all([
+        db.ref('/bets/' + betId).set(bet),
+        db.ref('/users/' + currentUser + '/betBalance').set(newBalance),
+        db.ref('/users/' + currentUser + '/lastBetWeek').set(currentWeek)
+    ]);
+
+    msg.innerHTML = '<div class="alert alert-success">Bet request submitted! ✅</div>';
+
+    // Clear form
+    document.getElementById('betSelection').value = '';
+    document.getElementById('betEvent').value = '';
+    document.getElementById('betNotes').value = '';
+    document.getElementById('betDescriptionPhoto').value = '';
+    document.getElementById('betScreenshot').value = '';
+    document.getElementById('screenshotPreview').style.display = 'none';
+    document.getElementById('screenshotDropText').style.display = '';
+    setInputMode('text');
+
+    // Build WhatsApp deep link and show copy card
+    const waMsg = buildWaMessage(bet);
+    document.getElementById('copyMsgBox').textContent = waMsg;
+    document.getElementById('waLink').href = 'https://wa.me/?text=' + encodeURIComponent(waMsg);
+    document.getElementById('copyCard').classList.remove('hidden');
+    document.getElementById('copyConfirm').textContent = '';
+
+    // Notify
+    sendDiscordNotification(bet);
+    sendEmailNotification(bet);
+}
+
+function buildWaMessage(bet) {
+    const ewTag  = bet.type === 'ew'      ? ' (EW)'        : '';
+    const fbTag  = bet.type === 'freeBet' ? ' [FREE BET]'  : '';
+    const eventStr = bet.event ? `\n📍 ${bet.event}` : '';
+    const notesStr = bet.notes ? `\n💬 ${bet.notes}` : '';
+    const photoStr = bet.hasScreenshot ? `\n📸 Screenshot attached in app` : '';
+    return `#betreq\n👤 ${bet.user}\n🎯 ${bet.selection}${ewTag}${fbTag}\n💰 Stake: €${bet.stake}${eventStr}${notesStr}${photoStr}`;
+}
+
+function onWaClick() {
+    // WhatsApp link already set on the href — just confirm to user
+    setTimeout(() => {
+        document.getElementById('copyConfirm').textContent = '✅ WhatsApp opened — pick your group and send!';
+    }, 400);
+}
+
+function copyBetMsg() {
+    const text = document.getElementById('copyMsgBox').textContent;
+    const confirm = document.getElementById('copyConfirm');
+    navigator.clipboard.writeText(text).then(() => {
+        confirm.textContent = '✅ Copied! Now paste into WhatsApp.';
+    }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        confirm.textContent = '✅ Copied!';
+    });
+}
+
+// ── Feed badge: count my bets that changed to placed/won/lost since last seen ──
+let seenBetStatuses = {};   // betId → last known status
+
+function updateFeedBadge() {
+    let unseen = 0;
+    Object.values(appData.bets).forEach(b => {
+        if (b.user !== currentUser) return;
+        const prev = seenBetStatuses[b.id];
+        // Count as unseen if status changed TO placed/won/lost and we haven't acknowledged it
+        if (['placed','won','lost'].includes(b.status) && prev !== b.status) {
+            unseen++;
+        }
+    });
+    const nav = document.getElementById('nav-feed');
+    if (!nav) return;
+    let badge = nav.querySelector('.nav-badge');
+    if (unseen > 0) {
+        if (!badge) { badge = document.createElement('span'); badge.className = 'nav-badge'; nav.appendChild(badge); }
+        badge.textContent = unseen;
+    } else {
+        if (badge) badge.remove();
+    }
+}
+
+function clearFeedBadge() {
+    // Mark all current statuses as seen
+    Object.values(appData.bets).forEach(b => {
+        if (b.user === currentUser) seenBetStatuses[b.id] = b.status;
+    });
+    const badge = document.getElementById('nav-feed')?.querySelector('.nav-badge');
+    if (badge) badge.remove();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FEED
+// ══════════════════════════════════════════════════════════════
+function setFeedFilter(f) {
+    feedFilter = f;
+    ['week','all','mine','pending'].forEach(x => {
+        document.getElementById('ff-' + x)?.classList.toggle('active', x === f);
+    });
+    renderFeed();
+}
+
+function renderFeed() {
+    clearFeedBadge();
+    const el = document.getElementById('feedContainer');
+    let bets = Object.values(appData.bets).sort((a,b) => b.submittedAt - a.submittedAt);
+
+    if (feedFilter === 'week')    bets = bets.filter(b => b.week === currentWeek);
+    if (feedFilter === 'mine')    bets = bets.filter(b => b.user === currentUser);
+    if (feedFilter === 'pending') bets = bets.filter(b => b.status === 'pending');
+
+    if (!bets.length) {
+        el.innerHTML = '<p style="color:var(--text-light)">No bets to show.</p>';
+        return;
+    }
+    el.innerHTML = bets.map(b => betCardHtml(b, true)).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  LEADERBOARD
+// ══════════════════════════════════════════════════════════════
+function setLbView(v) {
+    lbView = v;
+    document.getElementById('lbViewAll').className  = v === 'all'  ? 'btn btn-sm' : 'btn btn-sm btn-ghost';
+    document.getElementById('lbViewWeek').className = v === 'week' ? 'btn btn-sm' : 'btn btn-sm btn-ghost';
+    if (v === 'all')  { document.getElementById('lbViewAll').style.background  = 'var(--navy-mid)'; document.getElementById('lbViewAll').style.color  = '#fff'; }
+    if (v === 'week') { document.getElementById('lbViewWeek').style.background = 'var(--navy-mid)'; document.getElementById('lbViewWeek').style.color = '#fff'; }
+    renderLeaderboard();
+}
+
+function renderLeaderboard() {
+    // Summary stats
+    const allBets = Object.values(appData.bets);
+    const settled = allBets.filter(b => b.status === 'won' || b.status === 'lost');
+    const totalStaked = settled.reduce((s,b) => s + (parseFloat(b.stake)||0), 0);
+    const totalWon = settled.filter(b => b.status === 'won').length;
+    const bigWins  = settled.filter(b => b.status === 'won' && isBigOdds(b.odds)).length;
+    document.getElementById('lbStats').innerHTML = `
+        <div class="stat-card"><div class="stat-val">${allBets.length}</div><div class="stat-label">Total Bets</div></div>
+        <div class="stat-card"><div class="stat-val">${totalWon}</div><div class="stat-label">Winners</div></div>
+        <div class="stat-card"><div class="stat-val">€${totalStaked.toFixed(0)}</div><div class="stat-label">Total Staked</div></div>
+        <div class="stat-card"><div class="stat-val">${bigWins}</div><div class="stat-label">Big Odds Wins (${BIG_ODDS_THRESHOLD}/1+)</div></div>
+    `;
+
+    // Table
+    const rows = MEMBERS.map(m => {
+        const pnl     = lbView === 'week' ? getWeeklyPnl(m, currentWeek) : getAllTimePnl(m);
+        const bets    = getUserBets(m, lbView === 'week' ? currentWeek : null);
+        const settled = bets.filter(b => b.status === 'won' || b.status === 'lost');
+        const won     = bets.filter(b => b.status === 'won').length;
+        const sr      = settled.length ? Math.round((won / settled.length) * 100) : 0;
+        const balance = getUserBalance(m);
+        return { m, pnl, placed: settled.length, won, sr, balance };
+    }).sort((a,b) => b.pnl - a.pnl);
+
+    const freeBetHolder = getCurrentFreeBetHolder();
+    const isWeek = lbView === 'week';
+
+    const tableRows = rows.map((r, i) => {
+        const pos = i + 1;
+        const badgeClass = pos === 1 ? 'pos-1' : pos === 2 ? 'pos-2' : pos === 3 ? 'pos-3' : 'pos-n';
+        const isMe = r.m === currentUser;
+        const crown = r.m === freeBetHolder ? ' <span class="crown" title="Free bet holder">🎁</span>' : '';
+        return `<tr class="${isMe ? 'me' : ''} ${pos === 1 ? 'top' : ''}">
+            <td><span class="pos-badge ${badgeClass}">${pos}</span></td>
+            <td><strong>${esc(r.m)}</strong>${crown}</td>
+            <td class="${r.pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${fmtEuro(r.pnl)}</td>
+            ${isWeek ? `<td>${r.placed}</td><td>${r.won}</td><td>${r.sr}%</td>` : ''}
+            <td>${r.balance}</td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('lbContainer').innerHTML = `
+        ${isWeek ? '<p style="font-size:0.78em;color:var(--text-light);margin-bottom:8px">Placed / Won / SR% are for this week only</p>' : ''}
+        <table class="lb-table">
+            <thead><tr>
+                <th>#</th><th>Player</th><th>P&L</th>
+                ${isWeek ? '<th>Placed</th><th>Won</th><th>SR%</th>' : ''}
+                <th>Bets Left</th>
+            </tr></thead>
+            <tbody>${tableRows}</tbody>
+        </table>`;
+
+    // Weekly winners
+    const prevWeeks = [];
+    for (let w = Math.max(1, currentWeek - 1); w >= 1; w--) {
+        prevWeeks.push(w);
+        if (prevWeeks.length >= 5) break;
+    }
+    if (!prevWeeks.length) {
+        document.getElementById('weeklyWinners').innerHTML = '<p style="color:var(--text-light)">No completed weeks yet.</p>';
+    } else {
+        document.getElementById('weeklyWinners').innerHTML = prevWeeks.map(w => {
+            const winner = getWeekTopTipster(w);
+            const pnl = winner ? getWeeklyPnl(winner, w) : 0;
+            return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+                <span class="week-badge">${weekLabel(w)}</span>
+                <strong>${winner ? esc(winner) : '—'}</strong>
+                ${winner ? `<span class="${pnl >= 0 ? 'pnl-pos':'pnl-neg'}" style="font-size:0.9em">${fmtEuro(pnl)}</span>` : ''}
+                <span style="font-size:0.82em;color:var(--text-light);margin-left:auto">${getWeekDates(w)}</span>
+            </div>`;
+        }).join('');
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  QUEUE (placers)
+// ══════════════════════════════════════════════════════════════
+function setQueueTab(t) {
+    queueTab = t;
+    ['pending','placed','settled'].forEach(x => {
+        document.getElementById('qt-' + x)?.classList.toggle('active', x === t);
+    });
+    renderQueue();
+}
+
+function renderQueue() {
+    const el = document.getElementById('queueContainer');
+    if (!isPlacer && !isAdmin) { el.innerHTML = '<p style="color:var(--text-light)">Only placers can view the queue.</p>'; return; }
+
+    let bets = Object.values(appData.bets).sort((a,b) => b.submittedAt - a.submittedAt);
+    if (queueTab === 'pending')  bets = bets.filter(b => b.status === 'pending');
+    if (queueTab === 'placed')   bets = bets.filter(b => b.status === 'placed');
+    if (queueTab === 'settled')  bets = bets.filter(b => ['won','lost','void'].includes(b.status));
+
+    if (!bets.length) {
+        el.innerHTML = `<p style="color:var(--text-light)">No ${queueTab} bets.</p>`;
+        return;
+    }
+    el.innerHTML = bets.map(b => betCardHtml(b, true, true)).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  BET CARD HTML
+// ══════════════════════════════════════════════════════════════
+function betCardHtml(b, showUser, showActions) {
+    const isMine = b.user === currentUser;
+    const big = isBigOdds(b.oddsPlaced || b.odds);
+    const profitStr = (b.status === 'won' && b.profit != null) ? `<span class="pnl-pos" style="font-weight:700">+€${parseFloat(b.profit).toFixed(2)}</span>` :
+                      (b.status === 'lost') ? `<span class="pnl-neg" style="font-weight:700">-€${b.stake}</span>` : '';
+
+    const oddsDisplay = b.oddsPlaced && b.oddsPlaced !== b.odds
+        ? `📊 <span style="text-decoration:line-through;color:var(--text-light)">${esc(b.odds)}</span> → <strong>${esc(b.oddsPlaced)}</strong>`
+        : (b.oddsPlaced ? `📊 ${esc(b.oddsPlaced)}` : (b.odds ? `📊 ${esc(b.odds)}` : ''));
+
+    const placedInfo = b.placedBy
+        ? `<span style="font-size:0.75em;color:var(--text-light)">placed by ${esc(b.placedBy)}</span>`
+        : '';
+
+    // Show screenshot to the bet owner and to placers/admins
+    const canSeeScreenshot = isMine || isPlacer || isAdmin;
+    const screenshotHtml = (b.screenshotUrl && canSeeScreenshot)
+        ? `<div style="margin:10px 0 4px">
+               <a href="${esc(b.screenshotUrl)}" target="_blank" rel="noopener">
+                   <img src="${esc(b.screenshotUrl)}" alt="Bet screenshot"
+                       style="max-width:100%;max-height:220px;border-radius:8px;object-fit:contain;border:1px solid var(--border);cursor:zoom-in">
+               </a>
+               <div style="font-size:0.75em;color:var(--text-light);margin-top:3px">📸 Tap image to open full size</div>
+           </div>`
+        : '';
+
+    const actions = showActions && (isPlacer || isAdmin) ? `
+        <div class="bet-actions">
+            ${b.status === 'pending' ? `<button class="btn btn-sm btn-green" onclick="markPlaced('${b.id}')">✅ Mark Placed</button>` : ''}
+            ${b.status === 'placed'  ? `<button class="btn btn-sm btn-gold"  onclick="openSettleModal('${b.id}')">🏁 Settle</button>` : ''}
+            ${['pending','placed'].includes(b.status) ? `<button class="btn btn-sm btn-red" onclick="voidBet('${b.id}')">⬜ Void</button>` : ''}
+        </div>` : '';
+
+    return `<div class="bet-card ${isMine ? 'mine' : ''}">
+        <div class="bet-card-top">
+            <div style="flex:1;min-width:0">
+                <div class="bet-selection">${esc(b.selection)}</div>
+                ${b.description ? `<div class="bet-detail" style="font-style:italic;color:var(--text-mid)">🏷 ${esc(b.description)}</div>` : ''}
+                ${b.event ? `<div class="bet-detail">📍 ${esc(b.event)}</div>` : ''}
+                ${b.notes ? `<div class="bet-detail">💬 ${esc(b.notes)}</div>` : ''}
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+                ${statusChip(b.status)}
+                ${profitStr ? `<div style="margin-top:4px">${profitStr}</div>` : ''}
+            </div>
+        </div>
+        ${screenshotHtml}
+        <div class="bet-card-meta">
+            ${showUser ? `<span class="bet-user-tag">👤 ${esc(b.user)}</span>` : ''}
+            ${oddsDisplay ? `<span class="bet-odds">${oddsDisplay}</span>` : ''}
+            <span class="bet-stake">💰 €${b.stake}</span>
+            ${b.type === 'ew' ? '<span class="status-chip chip-ew">EW</span>' : ''}
+            ${b.type === 'freeBet' ? '<span class="status-chip chip-freeBet">🎁 Free</span>' : ''}
+            ${big ? '<span class="big-odds-badge">⚡ Big Odds</span>' : ''}
+            <span class="week-badge">${weekLabel(b.week)}</span>
+            ${placedInfo}
+            <span style="font-size:0.75em;color:var(--text-light)">${fmtDate(b.submittedAt)}</span>
+        </div>
+        ${actions}
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  BET ACTIONS (placer)
+// ══════════════════════════════════════════════════════════════
+async function markPlaced(betId) {
+    placingBetId = betId;
+    const b = appData.bets[betId];
+    if (!b) return;
+    const screenshotHtml = b.screenshotUrl
+        ? `<div style="margin-bottom:14px">
+               <a href="${esc(b.screenshotUrl)}" target="_blank" rel="noopener">
+                   <img src="${esc(b.screenshotUrl)}" alt="Bet screenshot"
+                       style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain;border:1px solid var(--border);cursor:zoom-in">
+               </a>
+           </div>`
+        : '';
+    document.getElementById('placedModalContent').innerHTML = `
+        <p style="margin-bottom:14px;font-size:0.9em;color:var(--text-mid)">
+            <strong>${esc(b.user)}</strong> — ${esc(b.selection)}
+        </p>
+        ${screenshotHtml}
+        <div class="form-group">
+            <label>Odds placed at</label>
+            <input type="text" id="placedOdds" value="${esc(b.oddsPlaced || '')}" placeholder="e.g. 5/2">
+            <p style="font-size:0.78em;color:var(--text-light);margin-top:4px">Enter the actual odds you got</p>
+        </div>
+        <div class="form-group">
+            <label>Description (optional — e.g. "4-fold acca", "each way")</label>
+            <input type="text" id="placedDescription" value="${esc(b.description || '')}" placeholder="e.g. acca, e/w, Lucky 15...">
+        </div>
+        <div class="form-group">
+            <label>Placed by</label>
+            <input type="text" id="placedBy" value="${esc(currentUser)}" readonly style="background:var(--card-bg2)">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+            <button class="btn btn-green" onclick="confirmPlaced()">✅ Confirm Placed</button>
+            <button class="btn btn-ghost" onclick="closePlacedModal()">Cancel</button>
+        </div>`;
+    document.getElementById('placedModal').classList.remove('hidden');
+}
+
+function closePlacedModal() {
+    document.getElementById('placedModal').classList.add('hidden');
+    placingBetId = null;
+}
+
+async function confirmPlaced() {
+    const b = appData.bets[placingBetId];
+    if (!b) return;
+    const actualOdds  = document.getElementById('placedOdds').value.trim();
+    const description = document.getElementById('placedDescription').value.trim();
+    const updates = {
+        [`/bets/${b.id}/status`]:      'placed',
+        [`/bets/${b.id}/oddsPlaced`]:  actualOdds,
+        [`/bets/${b.id}/placedBy`]:    currentUser,
+        [`/bets/${b.id}/placedAt`]:    Date.now()
+    };
+    if (description) updates[`/bets/${b.id}/description`] = description;
+    await db.ref('/').update(updates);
+    closePlacedModal();
+}
+
+function openSettleModal(betId) {
+    settlingBetId = betId;
+    const b = appData.bets[betId];
+    if (!b) return;
+    const big = isBigOdds(b.oddsPlaced || b.odds);
+    document.getElementById('settleModalContent').innerHTML = `
+        <p style="margin-bottom:16px;font-size:0.9em;color:var(--text-mid)">
+            <strong>${esc(b.user)}</strong> — ${esc(b.selection)} @ ${esc(b.odds)} (€${b.stake})
+        </p>
+        ${big ? `<div class="alert alert-warning" style="font-size:0.85em">⚡ Big odds bet (${BIG_ODDS_THRESHOLD}/1+) — win earns a bonus bet!</div>` : ''}
+        <div class="form-group">
+            <label>Result</label>
+            <select id="settleResult">
+                <option value="won">Won ✅</option>
+                <option value="lost">Lost ❌</option>
+                <option value="void">Void ⬜</option>
+            </select>
+        </div>
+        <div class="form-group" id="settleReturnGroup">
+            <label>Returns (€ total back incl. stake)</label>
+            <input type="number" id="settleReturns" placeholder="e.g. 17.50" step="0.01" min="0">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+            <button class="btn btn-gold" onclick="settleBet()">Confirm</button>
+            <button class="btn btn-ghost" onclick="closeSettleModal()">Cancel</button>
+        </div>`;
+    document.getElementById('settleModal').classList.remove('hidden');
+}
+
+function closeSettleModal() {
+    document.getElementById('settleModal').classList.add('hidden');
+    settlingBetId = null;
+}
+
+async function settleBet() {
+    const b = appData.bets[settlingBetId];
+    if (!b) return;
+    const result  = document.getElementById('settleResult').value;
+    const returns = parseFloat(document.getElementById('settleReturns').value) || 0;
+    const profit  = result === 'won' ? (returns - b.stake) : (result === 'lost' ? -b.stake : 0);
+
+    const user    = appData.users[b.user] || {};
+    const balance = getUserBalance(b.user);
+    const betsNeeded = (b.stake / BET_VALUE);
+
+    let newBalance = balance;
+    let pnlDelta   = 0;
+
+    if (result === 'won') {
+        // Bet is returned + profit
+        newBalance = Math.min(MAX_CARRY, balance + betsNeeded);
+        // Big odds bonus bet
+        if (isBigOdds(b.odds)) newBalance = Math.min(MAX_CARRY, newBalance + 1);
+        pnlDelta = profit;
+    } else if (result === 'lost') {
+        pnlDelta = -b.stake;
+        // balance already deducted at submit time
+    } else if (result === 'void') {
+        // Refund the bets
+        newBalance = Math.min(MAX_CARRY, balance + betsNeeded);
+        pnlDelta   = 0;
+    }
+
+    const newTotalPnl = (getAllTimePnl(b.user)) + pnlDelta;
+
+    const updates = {
+        [`/bets/${b.id}/status`]:  result,
+        [`/bets/${b.id}/profit`]:  profit,
+        [`/bets/${b.id}/returns`]: returns,
+        [`/bets/${b.id}/settledAt`]: Date.now(),
+        [`/users/${b.user}/betBalance`]: newBalance,
+        [`/users/${b.user}/totalPnl`]:   newTotalPnl,
+    };
+    if (result === 'won') {
+        updates[`/users/${b.user}/betsWon`] = (user.betsWon || 0) + 1;
+    }
+    await db.ref('/').update(updates);
+
+    // Delete screenshot from Storage now that bet is settled
+    deleteScreenshot(b);
+
+    closeSettleModal();
+}
+
+async function voidBet(betId) {
+    if (!confirm('Void this bet and refund the stake?')) return;
+    const b = appData.bets[betId];
+    if (!b) return;
+    const balance    = getUserBalance(b.user);
+    const betsNeeded = b.stake / BET_VALUE;
+    const newBalance = Math.min(MAX_CARRY, balance + (b.type === 'freeBet' ? 0 : betsNeeded));
+    await db.ref('/').update({
+        [`/bets/${betId}/status`]: 'void',
+        [`/users/${b.user}/betBalance`]: newBalance
+    });
+
+    // Delete screenshot on void too
+    deleteScreenshot(b);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ADMIN
+// ══════════════════════════════════════════════════════════════
+function showAdminTab(t) {
+    adminTab = t;
+    ['week','users','import','config'].forEach(x => {
+        document.getElementById('at-' + x)?.classList.toggle('active', x === t);
+        document.getElementById('adminTab-' + x)?.classList.toggle('hidden', x !== t);
+    });
+    if (t === 'users')  renderAdminUsers();
+    if (t === 'config') renderAdminConfig();
+}
+
+function renderAdmin() {
+    // Show the right card based on role
+    document.getElementById('settingsUserCard').classList.toggle('hidden', isAdmin);
+    document.getElementById('settingsAdminCard').classList.toggle('hidden', !isAdmin);
+
+    if (!isAdmin) return;
+
+    document.getElementById('adminWeekInfo').innerHTML = `
+        <div class="dash-stat" style="display:inline-block;padding:12px 16px;background:var(--card-bg2);border:1.5px solid var(--border);border-radius:8px">
+            Current: <strong>${weekLabel(currentWeek)}</strong> &nbsp;|&nbsp; ${getWeekDates(currentWeek)}
+        </div>`;
+    const sel = document.getElementById('freeBetOverride');
+    if (appData.config?.freeBetOverride) sel.value = appData.config.freeBetOverride;
+
+    // Populate retro member select
+    const retroSel = document.getElementById('retroMember');
+    if (retroSel && !retroSel.options.length) {
+        MEMBERS.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; retroSel.appendChild(o); });
+    }
+    document.getElementById('retroWeek').value = currentWeek;
+
+    if (adminTab === 'users')  renderAdminUsers();
+    if (adminTab === 'config') renderAdminConfig();
+}
+
+function renderAdminUsers() {
+    const rows = MEMBERS.map(m => {
+        const u = appData.users[m] || {};
+        const balance = getUserBalance(m);
+        return `<tr>
+            <td><strong>${esc(m)}</strong></td>
+            <td>${balance}</td>
+            <td class="${getAllTimePnl(m) >= 0 ? 'pnl-pos':'pnl-neg'}">${fmtEuro(getAllTimePnl(m))}</td>
+            <td>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <button class="btn btn-sm btn-ghost" onclick="adjustBalance('${m}',-1)">−</button>
+                    <button class="btn btn-sm btn-ghost" onclick="adjustBalance('${m}',1)">+</button>
+                    <button class="btn btn-sm" style="background:var(--amber);color:#fff" onclick="resetPin('${m}')">Reset PIN</button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+    document.getElementById('adminUsersTable').innerHTML = `
+        <table class="history-table">
+            <thead><tr><th>Name</th><th>Bets</th><th>P&L</th><th>Actions</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+}
+
+async function adjustBalance(user, delta) {
+    const current = getUserBalance(user);
+    const newVal  = Math.max(0, Math.min(MAX_CARRY, current + delta));
+    await db.ref('/users/' + user + '/betBalance').set(newVal);
+}
+
+async function resetPin(user) {
+    if (!confirm(`Reset ${user}'s PIN to 1234?`)) return;
+    await db.ref('/users/' + user + '/pin').set('1234');
+    alert(`${user}'s PIN reset to 1234`);
+}
+
+function renderAdminConfig() {
+    const c = appData.config || {};
+    document.getElementById('cfgStartDate').value      = c.startDate || '2026-06-20';
+    document.getElementById('cfgBetsPerWeek').value    = c.betsPerWeek || BETS_PER_WEEK;
+    document.getElementById('cfgDiscord').value        = c.discordWebhook || '';
+    document.getElementById('cfgEmailService').value   = c.emailService || '';
+    document.getElementById('cfgEmailTemplate').value  = c.emailTemplate || '';
+    document.getElementById('cfgEmailKey').value       = c.emailKey || '';
+    document.getElementById('cfgPlacerEmails').value   = c.placerEmails || '';
+}
+
+async function saveSyndicateSettings() {
+    const startDate   = document.getElementById('cfgStartDate').value;
+    const betsPerWeek = parseInt(document.getElementById('cfgBetsPerWeek').value) || BETS_PER_WEEK;
+    await db.ref('/').update({
+        '/config/startDate':   startDate,
+        '/config/betsPerWeek': betsPerWeek
+    });
+    const msg = document.getElementById('cfgSettingsMsg');
+    msg.innerHTML = '<div class="alert alert-success">Settings saved.</div>';
+    setTimeout(() => msg.innerHTML = '', 3000);
+}
+
+async function saveConfig() {
+    const updates = {
+        '/config/discordWebhook': document.getElementById('cfgDiscord').value.trim(),
+        '/config/emailService':   document.getElementById('cfgEmailService').value.trim(),
+        '/config/emailTemplate':  document.getElementById('cfgEmailTemplate').value.trim(),
+        '/config/emailKey':       document.getElementById('cfgEmailKey').value.trim(),
+        '/config/placerEmails':   document.getElementById('cfgPlacerEmails').value.trim(),
+    };
+    await db.ref('/').update(updates);
+    document.getElementById('cfgMsg').innerHTML = '<div class="alert alert-success">Config saved.</div>';
+    setTimeout(() => document.getElementById('cfgMsg').innerHTML = '', 3000);
+}
+
+async function savePin() {
+    // Reads from whichever card is visible
+    const p1id = isAdmin ? 'newPinAdmin' : 'newPin';
+    const p2id = isAdmin ? 'newPin2Admin' : 'newPin2';
+    const p1  = document.getElementById(p1id).value;
+    const p2  = document.getElementById(p2id).value;
+    const msg = document.getElementById('pinMsg');
+    if (p1.length !== 4 || !/^\d+$/.test(p1)) { msg.innerHTML = '<div class="alert alert-error">PIN must be 4 digits.</div>'; return; }
+    if (p1 !== p2) { msg.innerHTML = '<div class="alert alert-error">PINs do not match.</div>'; return; }
+    await db.ref('/users/' + currentUser + '/pin').set(p1);
+    msg.innerHTML = '<div class="alert alert-success">PIN updated.</div>';
+    setTimeout(() => msg.innerHTML = '', 3000);
+}
+
+async function advanceWeek() {
+    const bpw = appData.config?.betsPerWeek || BETS_PER_WEEK;
+    if (!confirm(`Advance to Week ${currentWeek + 1}? This will:\n- Add ${bpw} bets to everyone's balance (max ${MAX_CARRY})\n- Apply activity rule (forfeit 1 bet if no bet in last ${ACTIVITY_WEEKS} weeks)`)) return;
+
+    const updates = { '/currentWeek': currentWeek + 1 };
+
+    for (const m of MEMBERS) {
+        const balance = getUserBalance(m);
+        let newBalance = Math.min(MAX_CARRY, balance + bpw);
+
+        // Activity rule: if no bets in last ACTIVITY_WEEKS, forfeit 1 bet
+        let hasBet = false;
+        for (let w = currentWeek - ACTIVITY_WEEKS + 1; w <= currentWeek; w++) {
+            if (getUserBets(m, w).length) { hasBet = true; break; }
+        }
+        if (!hasBet && newBalance > 0) newBalance -= 1;
+
+        updates['/users/' + m + '/betBalance'] = newBalance;
+    }
+
+    await db.ref('/').update(updates);
+    document.getElementById('adminWeekMsg').innerHTML = '<div class="alert alert-success">Week advanced! Balances updated.</div>';
+    setTimeout(() => document.getElementById('adminWeekMsg').innerHTML = '', 4000);
+
+    // Auto-backup: email a full JSON export to placers
+    try { await emailWeeklyBackup(currentWeek); } catch (_) { /* silent */ }
+}
+
+async function saveFreeBetOverride() {
+    const val = document.getElementById('freeBetOverride').value;
+    await db.ref('/config/freeBetOverride').set(val || null);
+}
+
+async function addRetroBet() {
+    const member    = document.getElementById('retroMember').value;
+    const week      = parseInt(document.getElementById('retroWeek').value);
+    const selection = document.getElementById('retroSelection').value.trim();
+    const stake     = parseFloat(document.getElementById('retroStake').value);
+    const type      = document.getElementById('retroType').value;
+    const status    = document.getElementById('retroStatus').value;
+    const odds      = document.getElementById('retroOdds').value.trim();
+    const returns   = parseFloat(document.getElementById('retroReturns').value) || 0;
+    const msg       = document.getElementById('retroMsg');
+
+    if (!selection) { msg.innerHTML = '<div class="alert alert-error">Please enter a selection.</div>'; return; }
+    if (!week)      { msg.innerHTML = '<div class="alert alert-error">Please enter a week number.</div>'; return; }
+
+    const betId = db.ref('/bets').push().key;
+    const profit = status === 'won' ? (returns - stake) : (status === 'lost' ? -stake : null);
+
+    const bet = {
+        id: betId, user: member, selection, stake, type, status, week,
+        submittedAt: Date.now(), placedBy: currentUser, placedAt: Date.now(),
+        oddsPlaced: odds, profit,
+        ...(status === 'won' ? { returns } : {})
+    };
+
+    const updates = { [`/bets/${betId}`]: bet };
+
+    // Update P&L if settled
+    if (status === 'won' || status === 'lost') {
+        const newPnl = getAllTimePnl(member) + (profit || 0);
+        updates[`/users/${member}/totalPnl`] = Math.round(newPnl * 100) / 100;
+        if (status === 'won') {
+            updates[`/users/${member}/betsWon`] = (appData.users[member]?.betsWon || 0) + 1;
+        }
+    }
+
+    await db.ref('/').update(updates);
+
+    // Clear form
+    document.getElementById('retroSelection').value = '';
+    document.getElementById('retroOdds').value = '';
+    document.getElementById('retroReturns').value = '';
+    msg.innerHTML = `<div class="alert alert-success">Bet added for ${member} — Week ${week}.</div>`;
+    setTimeout(() => msg.innerHTML = '', 4000);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PADDY POWER CSV IMPORT
+// ══════════════════════════════════════════════════════════════
+async function importPpCsv() {
+    const raw = document.getElementById('importCsvText').value.trim();
+    const msg = document.getElementById('importMsg');
+    if (!raw) { msg.innerHTML = '<div class="alert alert-error">Paste CSV content first.</div>'; return; }
+
+    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) { msg.innerHTML = '<div class="alert alert-error">CSV too short.</div>'; return; }
+
+    // Auto-detect header columns (PP exports vary slightly)
+    const header = lines[0].split(',').map(h => h.replace(/^"|"$/g,'').trim().toLowerCase());
+    const col = name => header.findIndex(h => h.includes(name));
+
+    const selCol  = col('selection') >= 0 ? col('selection') : col('bet');
+    const oddsCol = col('odds') >= 0 ? col('odds') : col('price');
+    const retCol  = col('return') >= 0 ? col('return') : col('payout');
+    const stakeCol= col('stake');
+    const resCol  = col('result') >= 0 ? col('result') : col('outcome');
+
+    let matched = 0, skipped = 0;
+    const updates = {};
+
+    for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g,'').trim());
+        const selection = cols[selCol] || '';
+        const returns   = parseFloat(cols[retCol]) || 0;
+        const result    = (cols[resCol] || '').toLowerCase();
+        if (!selection) { skipped++; continue; }
+
+        // Try to match against pending/placed bets
+        const pendingBets = Object.values(appData.bets)
+            .filter(b => ['pending','placed'].includes(b.status) && b.week === currentWeek);
+
+        const matchedBet = pendingBets.find(b =>
+            normalizeStr(b.selection).includes(normalizeStr(selection)) ||
+            normalizeStr(selection).includes(normalizeStr(b.selection))
+        );
+
+        if (!matchedBet) { skipped++; continue; }
+
+        const isWon  = result.includes('won') || result.includes('win') || returns > matchedBet.stake;
+        const status = isWon ? 'won' : 'lost';
+        const profit = isWon ? returns - matchedBet.stake : -matchedBet.stake;
+
+        const balance    = getUserBalance(matchedBet.user);
+        const betsNeeded = matchedBet.stake / BET_VALUE;
+        let newBalance = balance;
+        if (isWon) {
+            newBalance = Math.min(MAX_CARRY, balance + betsNeeded + (isBigOdds(matchedBet.odds) ? 1 : 0));
+        }
+        const newPnl = getAllTimePnl(matchedBet.user) + profit;
+
+        updates[`/bets/${matchedBet.id}/status`]    = status;
+        updates[`/bets/${matchedBet.id}/profit`]     = profit;
+        updates[`/bets/${matchedBet.id}/returns`]    = returns;
+        updates[`/bets/${matchedBet.id}/settledAt`]  = Date.now();
+        updates[`/users/${matchedBet.user}/betBalance`] = newBalance;
+        updates[`/users/${matchedBet.user}/totalPnl`]   = newPnl;
+        if (isWon) updates[`/users/${matchedBet.user}/betsWon`] = (appData.users[matchedBet.user]?.betsWon || 0) + 1;
+        matched++;
+    }
+
+    if (Object.keys(updates).length) await db.ref('/').update(updates);
+    msg.innerHTML = `<div class="alert alert-success">Matched &amp; settled ${matched} bet(s). ${skipped} row(s) unmatched.</div>`;
+}
+
+async function importHistory() {
+    const raw = document.getElementById('importHistoryCsv').value.trim();
+    const msg = document.getElementById('importHistoryMsg');
+    if (!raw) return;
+    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) { msg.innerHTML = '<div class="alert alert-error">Need at least 1 data row.</div>'; return; }
+
+    let count = 0;
+    const updates = {};
+    for (let i = 1; i < lines.length; i++) {
+        const [name, week, selection, odds, stake, result, profit] = lines[i].split(',').map(s => s.trim());
+        if (!name || !selection) continue;
+        const betId = db.ref('/bets').push().key;
+        updates[`/bets/${betId}`] = {
+            id: betId, user: name, selection, odds,
+            stake: parseFloat(stake) || BET_VALUE,
+            type: 'single',
+            status: result || 'lost',
+            profit: parseFloat(profit) || 0,
+            week: parseInt(week) || 1,
+            submittedAt: Date.now() - (1000 * 60 * 60 * 24 * (currentWeek - (parseInt(week)||1)) * 7),
+            event: '', notes: ''
+        };
+        count++;
+    }
+    if (Object.keys(updates).length) await db.ref('/').update(updates);
+    msg.innerHTML = `<div class="alert alert-success">Imported ${count} historical bets.</div>`;
+}
+
+function normalizeStr(s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim(); }
+
+// ══════════════════════════════════════════════════════════════
+//  NOTIFICATIONS
+// ══════════════════════════════════════════════════════════════
+async function sendDiscordNotification(bet) {
+    const url = DISCORD_WEBHOOK || appData.config?.discordWebhook;
+    if (!url) return;
+    const big = isBigOdds(bet.odds);
+    const content = [
+        `📣 **New Bet Request**`,
+        `👤 **${bet.user}** — ${bet.selection}`,
+        `📊 Odds: \`${bet.odds}\`  💰 Stake: €${bet.stake}${bet.type === 'ew' ? ' (EW)' : ''}${bet.type === 'freeBet' ? ' 🎁 FREE BET' : ''}`,
+        bet.event ? `📍 ${bet.event}` : '',
+        bet.notes ? `💬 ${bet.notes}` : '',
+        big ? `⚡ *Big odds — win earns a bonus bet!*` : ''
+    ].filter(Boolean).join('\n');
+
+    try {
+        await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content })
+        });
+    } catch (_) { /* silent */ }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  EXPORT DATA
+// ══════════════════════════════════════════════════════════════
+function exportData() {
+    const msg = document.getElementById('exportMsg');
+    try {
+        const snapshot = JSON.stringify(appData, null, 2);
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const filename = `brady-syndicate-backup-${ts}.json`;
+        const blob = new Blob([snapshot], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+        msg.innerHTML = '<div class="alert alert-success">Export downloaded.</div>';
+        setTimeout(() => msg.innerHTML = '', 3000);
+    } catch (e) {
+        msg.innerHTML = `<div class="alert alert-error">Export failed: ${e.message}</div>`;
+    }
+}
+
+async function emailWeeklyBackup(closedWeek) {
+    const svc = EMAILJS_SERVICE  || appData.config?.emailService;
+    const tpl = EMAILJS_TEMPLATE || appData.config?.emailTemplate;
+    const key = EMAILJS_KEY      || appData.config?.emailKey;
+    const recipients = (appData.config?.placerEmails || '');
+    if (!svc || !tpl || !key || !recipients) return;
+
+    if (!window.emailjs) {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+        await new Promise(r => { s.onload = r; document.head.appendChild(s); });
+        emailjs.init(key);
+    }
+
+    const snapshot = JSON.stringify(appData, null, 2);
+    const ts = new Date().toLocaleDateString('en-IE', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    try {
+        await emailjs.send(svc, tpl, {
+            subject:    `Brady Syndicate — Week ${closedWeek} backup (${ts})`,
+            from_name:  'Brady Syndicate',
+            to_email:   recipients,
+            body:       `Automated weekly backup after advancing from Week ${closedWeek}.\n\nJSON data attached inline below:\n\n${snapshot}`,
+            week:       `Week ${closedWeek}`,
+            backup_json: snapshot
+        });
+    } catch (_) { /* silent — backup is best-effort */ }
+}
+
+async function sendEmailNotification(bet) {
+    const svc = EMAILJS_SERVICE  || appData.config?.emailService;
+    const tpl = EMAILJS_TEMPLATE || appData.config?.emailTemplate;
+    const key = EMAILJS_KEY      || appData.config?.emailKey;
+    if (!svc || !tpl || !key) return;
+
+    // Lazy-load EmailJS
+    if (!window.emailjs) {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+        await new Promise(r => { s.onload = r; document.head.appendChild(s); });
+        emailjs.init(key);
+    }
+
+    try {
+        await emailjs.send(svc, tpl, {
+            from_name: bet.user,
+            selection: bet.selection,
+            odds:  bet.odds,
+            stake: `€${bet.stake}`,
+            type:  bet.type,
+            event: bet.event || '—',
+            notes: bet.notes || '—',
+            week:  weekLabel(bet.week)
+        });
+    } catch (_) { /* silent */ }
+}
+
+</script>
+</body>
+</html>
