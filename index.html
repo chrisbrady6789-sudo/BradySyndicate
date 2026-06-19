@@ -37,7 +37,7 @@
             color: var(--text);
         }
 
-        /* ── HEADERs ── */
+        /* ── HEADER ── */
         .header {
             background: linear-gradient(135deg, #060f1e 0%, #0f2444 40%, #1a3a6e 70%, #0f2444 100%);
             color: var(--gold);
@@ -599,11 +599,9 @@
 
         <div class="form-row form-row-2">
             <div class="form-group">
-                <label>Stake (€)</label>
-                <select id="betStake">
-                    <option value="5">€5 (1 bet)</option>
-                    <option value="10">€10 (2 bets)</option>
-                </select>
+                <label>Requested stake (€)</label>
+                <input type="number" id="betStake" placeholder="e.g. 5, 2.50, 10" step="0.50" min="0.50">
+                <p style="font-size:0.78em;color:var(--text-light);margin-top:4px" id="betStakeHint"></p>
             </div>
             <div class="form-group">
                 <label>Type</label>
@@ -811,9 +809,25 @@
 
         <!-- Users tab -->
         <div id="adminTab-users" class="hidden">
-            <h3>Member Balances</h3>
-            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:14px">View and manually adjust bet balances</p>
+            <h3>Member Balances & Stats</h3>
+            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:14px">Adjust bet tokens, P&L, or reset PINs.</p>
             <div id="adminUsersTable"></div>
+
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <h3>Edit Member P&L</h3>
+            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:12px">Directly set a member's all-time P&L — use this to correct historical data.</p>
+            <div class="form-row form-row-2">
+                <div class="form-group">
+                    <label>Member</label>
+                    <select id="editPnlMember"></select>
+                </div>
+                <div class="form-group">
+                    <label>New all-time P&L (€)</label>
+                    <input type="number" id="editPnlValue" step="0.01" placeholder="e.g. -47.62">
+                </div>
+            </div>
+            <button class="btn btn-gold" onclick="saveEditPnl()">Save P&L</button>
+            <div id="editPnlMsg" style="margin-top:10px"></div>
         </div>
 
         <!-- Import tab -->
@@ -1057,7 +1071,7 @@ function logout() {
     document.getElementById('loginPage').classList.remove('hidden');
     document.getElementById('mainNav').classList.add('hidden');
     ['dashboard','submit','feed','leaderboard','queue','admin'].forEach(p =>
-        document.getElementById(p + 'Page').classList.add('hidden')
+        document.getElementById(p + 'Page')?.classList.add('hidden')
     );
 }
 
@@ -1314,7 +1328,23 @@ function renderSubmit() {
         </div>`;
     document.getElementById('submitMsg').innerHTML = '';
     document.getElementById('copyCard').classList.add('hidden');
+    document.getElementById('betStake').value = '';
+    document.getElementById('betStakeHint').textContent = '';
+    document.getElementById('betStake').oninput = updateStakeHint;
     setInputMode('text');
+}
+
+function updateStakeHint() {
+    const stake = parseFloat(document.getElementById('betStake').value);
+    const hint  = document.getElementById('betStakeHint');
+    const type  = document.getElementById('betType').value;
+    if (!stake || stake <= 0) { hint.textContent = ''; return; }
+    const betsNeeded = Math.ceil(stake / BET_VALUE);
+    const ewNote = type === 'ew' ? ` each way (€${(stake * 2).toFixed(2)} total)` : '';
+    const balance = getUserBalance(currentUser);
+    const canAfford = type === 'freeBet' || balance >= betsNeeded;
+    hint.style.color = canAfford ? 'var(--text-light)' : 'var(--red)';
+    hint.textContent = `${betsNeeded} bet token${betsNeeded !== 1 ? 's' : ''} deducted${ewNote}${!canAfford ? ' — not enough balance!' : ''}`;
 }
 
 let currentInputMode = 'text';
@@ -1368,6 +1398,8 @@ async function submitBet() {
 
     msg.innerHTML = '';
 
+    if (!stake || stake <= 0) { msg.innerHTML = '<div class="alert alert-error">Please enter a stake amount.</div>'; return; }
+
     let selection    = '';
     let screenshotFile = null;
 
@@ -1381,7 +1413,7 @@ async function submitBet() {
     }
 
     const balance    = getUserBalance(currentUser);
-    const betsNeeded = stake / BET_VALUE;
+    const betsNeeded = Math.ceil(stake / BET_VALUE);
 
     if (type !== 'freeBet' && balance < betsNeeded) {
         msg.innerHTML = `<div class="alert alert-error">Not enough bets! You have ${balance} bet(s) but need ${betsNeeded}.</div>`;
@@ -1757,6 +1789,10 @@ async function markPlaced(betId) {
             <p style="font-size:0.78em;color:var(--text-light);margin-top:4px">Enter the actual odds you got</p>
         </div>
         <div class="form-group">
+            <label>Actual stake (€) — confirm or adjust</label>
+            <input type="number" id="placedStake" value="${esc(b.stake || '')}" step="0.50" min="0.50" placeholder="e.g. 2.50">
+        </div>
+        <div class="form-group">
             <label>Description (optional — e.g. "4-fold acca", "each way")</label>
             <input type="text" id="placedDescription" value="${esc(b.description || '')}" placeholder="e.g. acca, e/w, Lucky 15...">
         </div>
@@ -1780,10 +1816,12 @@ async function confirmPlaced() {
     const b = appData.bets[placingBetId];
     if (!b) return;
     const actualOdds  = document.getElementById('placedOdds').value.trim();
+    const actualStake = parseFloat(document.getElementById('placedStake').value) || b.stake;
     const description = document.getElementById('placedDescription').value.trim();
     const updates = {
         [`/bets/${b.id}/status`]:      'placed',
         [`/bets/${b.id}/oddsPlaced`]:  actualOdds,
+        [`/bets/${b.id}/stake`]:       actualStake,
         [`/bets/${b.id}/placedBy`]:    currentUser,
         [`/bets/${b.id}/placedAt`]:    Date.now()
     };
@@ -1799,7 +1837,7 @@ function openSettleModal(betId) {
     const big = isBigOdds(b.oddsPlaced || b.odds);
     document.getElementById('settleModalContent').innerHTML = `
         <p style="margin-bottom:16px;font-size:0.9em;color:var(--text-mid)">
-            <strong>${esc(b.user)}</strong> — ${esc(b.selection)} @ ${esc(b.odds)} (€${b.stake})
+            <strong>${esc(b.user)}</strong> — ${esc(b.selection)} @ ${esc(b.oddsPlaced || b.odds || '—')} (€${b.stake})
         </p>
         ${big ? `<div class="alert alert-warning" style="font-size:0.85em">⚡ Big odds bet (${BIG_ODDS_THRESHOLD}/1+) — win earns a bonus bet!</div>` : ''}
         <div class="form-group">
@@ -1835,7 +1873,7 @@ async function settleBet() {
 
     const user    = appData.users[b.user] || {};
     const balance = getUserBalance(b.user);
-    const betsNeeded = (b.stake / BET_VALUE);
+    const betsNeeded = Math.ceil(b.stake / BET_VALUE);
 
     let newBalance = balance;
     let pnlDelta   = 0;
@@ -1843,8 +1881,8 @@ async function settleBet() {
     if (result === 'won') {
         // Bet is returned + profit
         newBalance = Math.min(MAX_CARRY, balance + betsNeeded);
-        // Big odds bonus bet
-        if (isBigOdds(b.odds)) newBalance = Math.min(MAX_CARRY, newBalance + 1);
+        // Big odds bonus bet — use actual placed odds
+        if (isBigOdds(b.oddsPlaced || b.odds)) newBalance = Math.min(MAX_CARRY, newBalance + 1);
         pnlDelta = profit;
     } else if (result === 'lost') {
         pnlDelta = -b.stake;
@@ -1881,7 +1919,7 @@ async function voidBet(betId) {
     const b = appData.bets[betId];
     if (!b) return;
     const balance    = getUserBalance(b.user);
-    const betsNeeded = b.stake / BET_VALUE;
+    const betsNeeded = Math.ceil(b.stake / BET_VALUE);
     const newBalance = Math.min(MAX_CARRY, balance + (b.type === 'freeBet' ? 0 : betsNeeded));
     await db.ref('/').update({
         [`/bets/${betId}/status`]: 'void',
@@ -1906,7 +1944,6 @@ function showAdminTab(t) {
 }
 
 function renderAdmin() {
-    // Show the right card based on role
     document.getElementById('settingsUserCard').classList.toggle('hidden', isAdmin);
     document.getElementById('settingsAdminCard').classList.toggle('hidden', !isAdmin);
 
@@ -1916,8 +1953,13 @@ function renderAdmin() {
         <div class="dash-stat" style="display:inline-block;padding:12px 16px;background:var(--card-bg2);border:1.5px solid var(--border);border-radius:8px">
             Current: <strong>${weekLabel(currentWeek)}</strong> &nbsp;|&nbsp; ${getWeekDates(currentWeek)}
         </div>`;
-    const sel = document.getElementById('freeBetOverride');
-    if (appData.config?.freeBetOverride) sel.value = appData.config.freeBetOverride;
+
+    // Populate freeBetOverride select
+    const fbSel = document.getElementById('freeBetOverride');
+    if (fbSel && fbSel.options.length === 1) {
+        MEMBERS.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; fbSel.appendChild(o); });
+    }
+    if (fbSel) fbSel.value = appData.config?.freeBetOverride || '';
 
     // Populate retro member select
     const retroSel = document.getElementById('retroMember');
@@ -1926,30 +1968,39 @@ function renderAdmin() {
     }
     document.getElementById('retroWeek').value = currentWeek;
 
+    // Populate editPnl member select
+    const pnlSel = document.getElementById('editPnlMember');
+    if (pnlSel && !pnlSel.options.length) {
+        MEMBERS.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; pnlSel.appendChild(o); });
+    }
+
     if (adminTab === 'users')  renderAdminUsers();
     if (adminTab === 'config') renderAdminConfig();
 }
 
 function renderAdminUsers() {
     const rows = MEMBERS.map(m => {
-        const u = appData.users[m] || {};
         const balance = getUserBalance(m);
         return `<tr>
             <td><strong>${esc(m)}</strong></td>
-            <td>${balance}</td>
             <td class="${getAllTimePnl(m) >= 0 ? 'pnl-pos':'pnl-neg'}">${fmtEuro(getAllTimePnl(m))}</td>
             <td>
                 <div style="display:flex;gap:6px;align-items:center">
                     <button class="btn btn-sm btn-ghost" onclick="adjustBalance('${m}',-1)">−</button>
+                    <strong style="min-width:18px;text-align:center">${balance}</strong>
                     <button class="btn btn-sm btn-ghost" onclick="adjustBalance('${m}',1)">+</button>
-                    <button class="btn btn-sm" style="background:var(--amber);color:#fff" onclick="resetPin('${m}')">Reset PIN</button>
+                    <input type="number" id="setbal-${m}" min="0" max="${MAX_CARRY}" placeholder="#"
+                        style="width:44px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;font-size:0.85em"
+                        onkeydown="if(event.key==='Enter') setBalance('${m}')">
+                    <button class="btn btn-sm" style="background:var(--navy-mid);color:#fff" onclick="setBalance('${m}')">Set</button>
                 </div>
             </td>
+            <td><button class="btn btn-sm" style="background:var(--amber);color:#fff" onclick="resetPin('${m}')">Reset PIN</button></td>
         </tr>`;
     }).join('');
     document.getElementById('adminUsersTable').innerHTML = `
         <table class="history-table">
-            <thead><tr><th>Name</th><th>Bets</th><th>P&L</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>P&L</th><th>Bets</th><th></th></tr></thead>
             <tbody>${rows}</tbody>
         </table>`;
 }
@@ -1958,6 +2009,26 @@ async function adjustBalance(user, delta) {
     const current = getUserBalance(user);
     const newVal  = Math.max(0, Math.min(MAX_CARRY, current + delta));
     await db.ref('/users/' + user + '/betBalance').set(newVal);
+}
+
+async function setBalance(user) {
+    const input = document.getElementById('setbal-' + user);
+    const val   = parseInt(input.value);
+    if (isNaN(val) || val < 0) return;
+    const newVal = Math.min(MAX_CARRY, val);
+    await db.ref('/users/' + user + '/betBalance').set(newVal);
+    input.value = '';
+}
+
+async function saveEditPnl() {
+    const member = document.getElementById('editPnlMember').value;
+    const val    = parseFloat(document.getElementById('editPnlValue').value);
+    const msg    = document.getElementById('editPnlMsg');
+    if (isNaN(val)) { msg.innerHTML = '<div class="alert alert-error">Enter a valid number.</div>'; return; }
+    await db.ref('/users/' + member + '/totalPnl').set(Math.round(val * 100) / 100);
+    document.getElementById('editPnlValue').value = '';
+    msg.innerHTML = `<div class="alert alert-success">${member}'s P&L updated to ${fmtEuro(val)}.</div>`;
+    setTimeout(() => msg.innerHTML = '', 3000);
 }
 
 async function resetPin(user) {
@@ -2141,7 +2212,7 @@ async function importPpCsv() {
         const profit = isWon ? returns - matchedBet.stake : -matchedBet.stake;
 
         const balance    = getUserBalance(matchedBet.user);
-        const betsNeeded = matchedBet.stake / BET_VALUE;
+        const betsNeeded = Math.ceil(matchedBet.stake / BET_VALUE);
         let newBalance = balance;
         if (isWon) {
             newBalance = Math.min(MAX_CARRY, balance + betsNeeded + (isBigOdds(matchedBet.odds) ? 1 : 0));
