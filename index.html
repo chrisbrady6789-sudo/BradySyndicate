@@ -2402,7 +2402,8 @@ async function sendDiscordNotification(bet) {
         `📊 Odds: \`${bet.odds}\`  💰 Stake: €${bet.stake}${bet.type === 'ew' ? ' (EW)' : ''}${bet.type === 'freeBet' ? ' 🎁 FREE BET' : ''}`,
         bet.event ? `📍 ${bet.event}` : '',
         bet.notes ? `💬 ${bet.notes}` : '',
-        big ? `⚡ *Big odds — win earns a bonus bet!*` : ''
+        big ? `⚡ *Big odds — win earns a bonus bet!*` : '',
+        bet.screenshotUrl ? `📸 ${bet.screenshotUrl}` : ''
     ].filter(Boolean).join('\n');
 
     try {
@@ -2468,7 +2469,8 @@ async function sendEmailNotification(bet) {
     const svc = EMAILJS_SERVICE  || appData.config?.emailService;
     const tpl = EMAILJS_TEMPLATE || appData.config?.emailTemplate;
     const key = EMAILJS_KEY      || appData.config?.emailKey;
-    if (!svc || !tpl || !key) return;
+    const to  = (appData.config?.placerEmails || '').trim();
+    if (!svc || !tpl || !key || !to) return;
 
     // Lazy-load EmailJS
     if (!window.emailjs) {
@@ -2480,16 +2482,21 @@ async function sendEmailNotification(bet) {
 
     try {
         await emailjs.send(svc, tpl, {
-            from_name: bet.user,
-            selection: bet.selection,
-            odds:  bet.odds,
-            stake: `€${bet.stake}`,
-            type:  bet.type,
-            event: bet.event || '—',
-            notes: bet.notes || '—',
-            week:  weekLabel(bet.week)
+            to_email:       to,
+            email:          to,
+            from_name:      bet.user,
+            subject:        `New bet from ${bet.user} — ${bet.selection}`,
+            selection:      bet.selection,
+            stake:          `€${bet.stake}`,
+            type:           bet.type,
+            event:          bet.event || '—',
+            notes:          bet.notes || '—',
+            week:           weekLabel(bet.week),
+            screenshot_url: bet.screenshotUrl || ''
         });
-    } catch (_) { /* silent */ }
+    } catch (e) {
+        console.error('EmailJS error:', e);
+    }
 }
 
 </script>
