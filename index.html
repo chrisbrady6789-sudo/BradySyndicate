@@ -257,37 +257,57 @@
         /* ── BET CARDS ── */
         .bet-card {
             border: 1.5px solid var(--border);
-            border-radius: 10px;
-            padding: 14px 16px;
-            margin-bottom: 10px;
-            background: var(--card-bg2);
+            border-radius: 12px;
+            margin-bottom: 12px;
+            background: var(--card-bg);
+            overflow: hidden;
             transition: box-shadow 0.15s;
         }
-        .bet-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.08); }
-        .bet-card.mine { border-color: var(--gold); background: rgba(255,215,0,0.04); }
-        .bet-card-top {
+        .bet-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+        .bet-card.mine  { border-color: var(--gold); }
+        .bet-card.won   { border-color: #86efac; box-shadow: 0 2px 12px rgba(34,197,94,0.15); }
+        .bet-card.won:hover { box-shadow: 0 4px 18px rgba(34,197,94,0.25); }
+
+        /* header row: user + selection + status chip */
+        .bet-card-header {
             display: flex; align-items: flex-start;
             justify-content: space-between; gap: 10px;
-            flex-wrap: wrap;
+            padding: 12px 14px 10px;
+            background: var(--card-bg2);
+            border-bottom: 1px solid var(--border);
         }
-        .bet-card-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-        .bet-selection { font-weight: 700; font-size: 1em; color: var(--navy-mid); flex: 1; min-width: 0; }
-        .bet-detail { font-size: 0.82em; color: var(--text-light); margin-top: 3px; }
+        .bet-card.won .bet-card-header  { background: linear-gradient(135deg,#f0fdf4,#dcfce7); border-bottom-color: #bbf7d0; }
+        .bet-card.mine .bet-card-header { background: rgba(255,215,0,0.05); }
+
+        /* body: main selection text */
+        .bet-card-body { padding: 11px 14px 12px; }
+
+        /* footer: meta chips row */
+        .bet-card-footer {
+            display: flex; align-items: center; flex-wrap: wrap;
+            gap: 6px; padding: 8px 14px;
+            background: var(--card-bg2); border-top: 1px solid var(--border);
+        }
+        .bet-card.won  .bet-card-footer { background: #f0fdf4; border-top-color: #bbf7d0; }
+        .bet-card.mine .bet-card-footer { background: rgba(255,215,0,0.04); }
+
+        .bet-selection { font-weight: 700; font-size: 1em; color: var(--navy-mid); word-break: break-word; }
+        .bet-detail    { font-size: 0.82em; color: var(--text-light); margin-top: 3px; }
+        .bet-user-tag  { font-weight: 700; color: var(--navy-mid); font-size: 0.88em; }
+        .bet-profit-large { font-size: 1.1em; font-weight: 900; white-space: nowrap; }
+
         .status-chip {
             display: inline-block; padding: 3px 10px; border-radius: 20px;
             font-size: 0.75em; font-weight: 700; white-space: nowrap;
         }
         .chip-pending  { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
         .chip-placed   { background: #eff6ff; border: 1px solid #93c5fd; color: #1d4ed8; }
-        .chip-won      { background: #f0fdf4; border: 1px solid #86efac; color: #15803d; }
+        .chip-won      { background: #dcfce7; border: 1px solid #86efac; color: #15803d; }
         .chip-lost     { background: #fff1f0; border: 1px solid #fca5a5; color: #b91c1c; }
         .chip-void     { background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; }
         .chip-freeBet  { background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; }
         .chip-ew       { background: #f0f9ff; border: 1px solid #7dd3fc; color: #0369a1; }
-        .bet-user-tag  { font-weight: 700; color: var(--navy-mid); font-size: 0.85em; }
-        .bet-odds      { font-size: 0.9em; color: var(--text-mid); font-weight: 600; }
-        .bet-stake     { font-size: 0.82em; color: var(--text-light); }
-        .bet-actions   { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+        .bet-actions   { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 14px; border-top: 1px solid var(--border); background: var(--card-bg2); }
         .big-odds-badge {
             background: linear-gradient(135deg, #f59e0b, #d97706);
             color: #fff; font-size: 0.72em; font-weight: 700;
@@ -569,8 +589,8 @@
         <!-- Text input mode -->
         <div id="inputModeText">
             <div class="form-group">
-                <label>Selection (what you're betting on)</label>
-                <input type="text" id="betSelection" placeholder="e.g. Man City to win, Cheltenham 3:30 — Midnight Sun">
+                <label>Your bet</label>
+                <textarea id="betSelection" rows="4" placeholder="Type your bet exactly as you'd send it on WhatsApp — e.g. Man City to win, 2.50 e/w Midnight Sun Cheltenham 3:30, 5 Lucky 15..."></textarea>
             </div>
         </div>
 
@@ -597,51 +617,7 @@
             </div>
         </div>
 
-        <div class="form-row form-row-2">
-            <div class="form-group">
-                <label>Requested stake (€)</label>
-                <input type="number" id="betStake" placeholder="e.g. 5, 2.50, 10" step="0.50" min="0.50">
-                <p style="font-size:0.78em;color:var(--text-light);margin-top:4px" id="betStakeHint"></p>
-            </div>
-            <div class="form-group">
-                <label>Type</label>
-                <select id="betType">
-                    <option value="single">Single</option>
-                    <option value="ew">Each Way</option>
-                    <option value="freeBet">Free Bet</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label>Event / Race (optional)</label>
-            <input type="text" id="betEvent" placeholder="e.g. Premier League, Ascot 2:30">
-        </div>
-
-        <div class="form-group">
-            <label>Notes (optional)</label>
-            <input type="text" id="betNotes" placeholder="Any extra info for the placer">
-        </div>
-
         <button class="btn btn-gold" style="margin-top:4px" onclick="submitBet()">Submit Bet Request</button>
-    </div>
-
-    <!-- Copy message appears here after submit -->
-    <div id="copyCard" class="card hidden">
-        <h2>📲 Send to WhatsApp</h2>
-        <p style="font-size:0.88em;color:var(--text-mid);margin-bottom:10px">Your bet is saved. Now send it to the group:</p>
-        <div class="copy-msg-box" id="copyMsgBox"></div>
-        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
-            <a id="waLink" href="#" target="_blank" class="btn btn-gold" style="text-decoration:none" onclick="onWaClick()">
-                📱 Open WhatsApp
-            </a>
-            <button class="btn btn-ghost" onclick="copyBetMsg()">📋 Copy text</button>
-            <button class="btn btn-ghost" onclick="document.getElementById('copyCard').classList.add('hidden')">Dismiss</button>
-        </div>
-        <p style="font-size:0.78em;color:var(--text-light);margin-top:8px">
-            Opens WhatsApp with the message ready — just pick the group and hit send.
-        </p>
-        <p id="copyConfirm" style="font-size:0.82em;color:var(--green-dark);margin-top:6px;font-weight:600"></p>
     </div>
 </div>
 
@@ -770,11 +746,9 @@
             </div>
             <div class="form-row form-row-2">
                 <div class="form-group">
-                    <label>Stake (€)</label>
-                    <select id="retroStake">
-                        <option value="5">€5</option>
-                        <option value="10">€10</option>
-                    </select>
+                    <label>Stake per line (€)</label>
+                    <input type="number" id="retroStake" step="0.50" min="0.50" placeholder="e.g. 2.50, 5, 10">
+                    <p style="font-size:0.78em;color:var(--text-light);margin-top:3px">For e/w enter the per-line stake (e.g. 2.50 e/w = €5 total)</p>
                 </div>
                 <div class="form-group">
                     <label>Type</label>
@@ -791,6 +765,7 @@
                     <select id="retroStatus">
                         <option value="placed">Placed (awaiting result)</option>
                         <option value="won">Won ✅</option>
+                        <option value="ew-place">📍 Placed only (EW — place payout, win lost)</option>
                         <option value="lost">Lost ❌</option>
                     </select>
                 </div>
@@ -930,6 +905,24 @@
         <button class="modal-close" onclick="closePlacedModal()">×</button>
         <div class="modal-title">✅ Mark as Placed</div>
         <div id="placedModalContent"></div>
+    </div>
+</div>
+
+<!-- WhatsApp popup modal (shown after bet submit) -->
+<div id="waModal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeWaModal()">×</button>
+        <div class="modal-title">📲 Send to WhatsApp</div>
+        <p style="font-size:0.88em;color:var(--text-mid);margin-bottom:10px">Your bet is saved! Now send it to the group:</p>
+        <div class="copy-msg-box" id="copyMsgBox"></div>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+            <a id="waLink" href="#" target="_blank" class="btn btn-gold" style="text-decoration:none" onclick="onWaClick()">
+                📱 Open WhatsApp
+            </a>
+            <button class="btn btn-ghost" onclick="copyBetMsg()">📋 Copy text</button>
+        </div>
+        <p style="font-size:0.78em;color:var(--text-light);margin-top:10px">Opens WhatsApp with the message ready — just pick the group and hit send.</p>
+        <p id="copyConfirm" style="font-size:0.82em;color:var(--green-dark);margin-top:6px;font-weight:600"></p>
     </div>
 </div>
 
@@ -1212,8 +1205,14 @@ function getWeeklyPnl(user, week) {
     return getUserBets(user, week)
         .filter(b => b.status === 'won' || b.status === 'lost')
         .reduce((sum, b) => {
-            if (b.status === 'won') return sum + (parseFloat(b.profit) || 0);
-            return sum - (parseFloat(b.stake) || BET_VALUE);
+            if (b.profit != null) return sum + parseFloat(b.profit);
+            // Fallback: free bets have no cost on loss; EW costs stake×2
+            if (b.status === 'lost') {
+                if (b.type === 'freeBet') return sum;
+                const cost = b.type === 'ew' ? (parseFloat(b.stake) || BET_VALUE) * 2 : (parseFloat(b.stake) || BET_VALUE);
+                return sum - cost;
+            }
+            return sum;
         }, 0);
 }
 
@@ -1327,24 +1326,7 @@ function renderSubmit() {
             <span style="font-size:0.85em;color:var(--text-mid)">Balance: <strong>${balance} bets (€${balance * BET_VALUE})</strong> &nbsp;|&nbsp; Used this week: <strong>${betsThisWeek}</strong></span>
         </div>`;
     document.getElementById('submitMsg').innerHTML = '';
-    document.getElementById('copyCard').classList.add('hidden');
-    document.getElementById('betStake').value = '';
-    document.getElementById('betStakeHint').textContent = '';
-    document.getElementById('betStake').oninput = updateStakeHint;
     setInputMode('text');
-}
-
-function updateStakeHint() {
-    const stake = parseFloat(document.getElementById('betStake').value);
-    const hint  = document.getElementById('betStakeHint');
-    const type  = document.getElementById('betType').value;
-    if (!stake || stake <= 0) { hint.textContent = ''; return; }
-    const betsNeeded = Math.ceil(stake / BET_VALUE);
-    const ewNote = type === 'ew' ? ` each way (€${(stake * 2).toFixed(2)} total)` : '';
-    const balance = getUserBalance(currentUser);
-    const canAfford = type === 'freeBet' || balance >= betsNeeded;
-    hint.style.color = canAfford ? 'var(--text-light)' : 'var(--red)';
-    hint.textContent = `${betsNeeded} bet token${betsNeeded !== 1 ? 's' : ''} deducted${ewNote}${!canAfford ? ' — not enough balance!' : ''}`;
 }
 
 let currentInputMode = 'text';
@@ -1390,33 +1372,25 @@ async function deleteScreenshot(bet) {
 
 async function submitBet() {
     const mode       = currentInputMode || 'text';
-    const stake      = parseFloat(document.getElementById('betStake').value);
-    const type       = document.getElementById('betType').value;
-    const event      = document.getElementById('betEvent').value.trim();
-    const notes      = document.getElementById('betNotes').value.trim();
     const msg        = document.getElementById('submitMsg');
 
     msg.innerHTML = '';
-
-    if (!stake || stake <= 0) { msg.innerHTML = '<div class="alert alert-error">Please enter a stake amount.</div>'; return; }
 
     let selection    = '';
     let screenshotFile = null;
 
     if (mode === 'text') {
         selection = document.getElementById('betSelection').value.trim();
-        if (!selection) { msg.innerHTML = '<div class="alert alert-error">Please enter the selection.</div>'; return; }
+        if (!selection) { msg.innerHTML = '<div class="alert alert-error">Please enter your bet.</div>'; return; }
     } else {
         screenshotFile = document.getElementById('betScreenshot').files[0];
         if (!screenshotFile) { msg.innerHTML = '<div class="alert alert-error">Please attach a screenshot.</div>'; return; }
         selection = document.getElementById('betDescriptionPhoto').value.trim() || '(screenshot)';
     }
 
-    const balance    = getUserBalance(currentUser);
-    const betsNeeded = Math.ceil(stake / BET_VALUE);
-
-    if (type !== 'freeBet' && balance < betsNeeded) {
-        msg.innerHTML = `<div class="alert alert-error">Not enough bets! You have ${balance} bet(s) but need ${betsNeeded}.</div>`;
+    const balance = getUserBalance(currentUser);
+    if (balance < 1) {
+        msg.innerHTML = `<div class="alert alert-error">No bets available! You have 0 bet tokens.</div>`;
         return;
     }
 
@@ -1447,14 +1421,17 @@ async function submitBet() {
         }
     }
 
+    // Deduct 1 bet token — admins will confirm exact stake/type when placing
+    const newBalance = Math.max(0, balance - 1);
+
     const bet = {
         id: betId,
         user: currentUser,
         selection,
-        stake,
-        type,
-        event,
-        notes,
+        stake: BET_VALUE,       // default; placer will confirm actual stake
+        type: 'single',         // default; placer will confirm type
+        event: '',
+        notes: '',
         status: 'pending',
         week: currentWeek,
         submittedAt: Date.now(),
@@ -1462,46 +1439,41 @@ async function submitBet() {
         ...(screenshotUrl ? { screenshotUrl, screenshotPublicId, hasScreenshot: true } : {})
     };
 
-    // Deduct bets immediately (optimistic — refunded if void)
-    const newBalance = type === 'freeBet' ? balance : Math.max(0, balance - betsNeeded);
-
     await Promise.all([
         db.ref('/bets/' + betId).set(bet),
         db.ref('/users/' + currentUser + '/betBalance').set(newBalance),
         db.ref('/users/' + currentUser + '/lastBetWeek').set(currentWeek)
     ]);
 
-    msg.innerHTML = '<div class="alert alert-success">Bet request submitted! ✅</div>';
+    msg.innerHTML = '<div class="alert alert-success">Bet submitted! ✅</div>';
 
     // Clear form
     document.getElementById('betSelection').value = '';
-    document.getElementById('betEvent').value = '';
-    document.getElementById('betNotes').value = '';
     document.getElementById('betDescriptionPhoto').value = '';
     document.getElementById('betScreenshot').value = '';
     document.getElementById('screenshotPreview').style.display = 'none';
     document.getElementById('screenshotDropText').style.display = '';
     setInputMode('text');
 
-    // Build WhatsApp deep link and show copy card
+    // Build WhatsApp deep link and show popup modal
     const waMsg = buildWaMessage(bet);
     document.getElementById('copyMsgBox').textContent = waMsg;
     document.getElementById('waLink').href = 'https://wa.me/?text=' + encodeURIComponent(waMsg);
-    document.getElementById('copyCard').classList.remove('hidden');
     document.getElementById('copyConfirm').textContent = '';
+    document.getElementById('waModal').classList.remove('hidden');
 
     // Notify
     sendDiscordNotification(bet);
     sendEmailNotification(bet);
 }
 
+function closeWaModal() {
+    document.getElementById('waModal').classList.add('hidden');
+}
+
 function buildWaMessage(bet) {
-    const ewTag  = bet.type === 'ew'      ? ' (EW)'        : '';
-    const fbTag  = bet.type === 'freeBet' ? ' [FREE BET]'  : '';
-    const eventStr = bet.event ? `\n📍 ${bet.event}` : '';
-    const notesStr = bet.notes ? `\n💬 ${bet.notes}` : '';
     const photoStr = bet.hasScreenshot ? `\n📸 Screenshot attached in app` : '';
-    return `#betreq\n👤 ${bet.user}\n🎯 ${bet.selection}${ewTag}${fbTag}\n💰 Stake: €${bet.stake}${eventStr}${notesStr}${photoStr}`;
+    return `#betreq\n👤 ${bet.user}\n🎯 ${bet.selection}${photoStr}`;
 }
 
 function onWaClick() {
@@ -1704,18 +1676,21 @@ function renderQueue() {
 function betCardHtml(b, showUser, showActions) {
     const isMine = b.user === currentUser;
     const big = isBigOdds(b.oddsPlaced || b.odds);
-    const profitStr = (b.status === 'won' && b.profit != null) ? `<span class="pnl-pos" style="font-weight:700">+€${parseFloat(b.profit).toFixed(2)}</span>` :
-                      (b.status === 'lost') ? `<span class="pnl-neg" style="font-weight:700">-€${b.stake}</span>` : '';
+    const isEw = b.type === 'ew';
+    const isFb = b.type === 'freeBet';
+    const totalStakeDisplay = isEw ? (parseFloat(b.stake) * 2).toFixed(2) : parseFloat(b.stake).toFixed(2);
+    const lossDisplay = isFb ? '€0' : `-€${totalStakeDisplay}`;
 
-    const oddsDisplay = b.oddsPlaced && b.oddsPlaced !== b.odds
-        ? `📊 <span style="text-decoration:line-through;color:var(--text-light)">${esc(b.odds)}</span> → <strong>${esc(b.oddsPlaced)}</strong>`
-        : (b.oddsPlaced ? `📊 ${esc(b.oddsPlaced)}` : (b.odds ? `📊 ${esc(b.odds)}` : ''));
-
-    const placedInfo = b.placedBy
-        ? `<span style="font-size:0.75em;color:var(--text-light)">placed by ${esc(b.placedBy)}</span>`
+    const profitStr = b.status === 'won' && b.profit != null
+        ? `<span class="bet-profit-large pnl-pos">+€${parseFloat(b.profit).toFixed(2)}</span>`
+        : b.status === 'lost'
+        ? `<span class="bet-profit-large pnl-neg">${lossDisplay}</span>`
         : '';
 
-    // Show screenshot to the bet owner and to placers/admins
+    const oddsDisplay = b.oddsPlaced && b.oddsPlaced !== b.odds
+        ? `<span style="text-decoration:line-through;opacity:0.5">${esc(b.odds)}</span> → <strong>${esc(b.oddsPlaced)}</strong>`
+        : (b.oddsPlaced || b.odds || '');
+
     const canSeeScreenshot = isMine || isPlacer || isAdmin;
     const screenshotHtml = (b.screenshotUrl && canSeeScreenshot)
         ? `<div style="margin:10px 0 4px">
@@ -1723,7 +1698,7 @@ function betCardHtml(b, showUser, showActions) {
                    <img src="${esc(b.screenshotUrl)}" alt="Bet screenshot"
                        style="max-width:100%;max-height:220px;border-radius:8px;object-fit:contain;border:1px solid var(--border);cursor:zoom-in">
                </a>
-               <div style="font-size:0.75em;color:var(--text-light);margin-top:3px">📸 Tap image to open full size</div>
+               <div style="font-size:0.75em;color:var(--text-light);margin-top:3px">📸 Tap to open full size</div>
            </div>`
         : '';
 
@@ -1732,32 +1707,32 @@ function betCardHtml(b, showUser, showActions) {
             ${b.status === 'pending' ? `<button class="btn btn-sm btn-green" onclick="markPlaced('${b.id}')">✅ Mark Placed</button>` : ''}
             ${b.status === 'placed'  ? `<button class="btn btn-sm btn-gold"  onclick="openSettleModal('${b.id}')">🏁 Settle</button>` : ''}
             ${['pending','placed'].includes(b.status) ? `<button class="btn btn-sm btn-red" onclick="voidBet('${b.id}')">⬜ Void</button>` : ''}
+            ${isAdmin ? `<button class="btn btn-sm" style="background:#6b7280;color:#fff" onclick="deleteBet('${b.id}')">🗑 Delete</button>` : ''}
         </div>` : '';
 
-    return `<div class="bet-card ${isMine ? 'mine' : ''}">
-        <div class="bet-card-top">
-            <div style="flex:1;min-width:0">
+    return `<div class="bet-card ${isMine ? 'mine' : ''} ${b.status === 'won' ? 'won' : ''}">
+        <div class="bet-card-header">
+            <div style="min-width:0">
+                ${showUser ? `<div class="bet-user-tag" style="margin-bottom:4px">👤 ${esc(b.user)}</div>` : ''}
                 <div class="bet-selection">${esc(b.selection)}</div>
-                ${b.description ? `<div class="bet-detail" style="font-style:italic;color:var(--text-mid)">🏷 ${esc(b.description)}</div>` : ''}
-                ${b.event ? `<div class="bet-detail">📍 ${esc(b.event)}</div>` : ''}
-                ${b.notes ? `<div class="bet-detail">💬 ${esc(b.notes)}</div>` : ''}
+                ${b.description ? `<div class="bet-detail">🏷 ${esc(b.description)}</div>` : ''}
             </div>
-            <div style="text-align:right;flex-shrink:0">
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
                 ${statusChip(b.status)}
-                ${profitStr ? `<div style="margin-top:4px">${profitStr}</div>` : ''}
+                ${profitStr}
             </div>
         </div>
-        ${screenshotHtml}
-        <div class="bet-card-meta">
-            ${showUser ? `<span class="bet-user-tag">👤 ${esc(b.user)}</span>` : ''}
-            ${oddsDisplay ? `<span class="bet-odds">${oddsDisplay}</span>` : ''}
-            <span class="bet-stake">💰 €${b.stake}</span>
-            ${b.type === 'ew' ? '<span class="status-chip chip-ew">EW</span>' : ''}
-            ${b.type === 'freeBet' ? '<span class="status-chip chip-freeBet">🎁 Free</span>' : ''}
+        ${screenshotHtml ? `<div style="padding:10px 14px 0">${screenshotHtml}</div>` : ''}
+        <div class="bet-card-footer">
+            ${oddsDisplay ? `<span style="font-weight:600;color:var(--text-mid)">@ ${oddsDisplay}</span><span class="bet-card-footer-sep">·</span>` : ''}
+            <span>💰 ${isEw ? `€${parseFloat(b.stake).toFixed(2)} e/w (€${totalStakeDisplay} total)` : `€${totalStakeDisplay}`}</span>
+            ${isFb ? '<span class="status-chip chip-freeBet" style="font-size:0.7em">🎁 Free Bet</span>' : ''}
             ${big ? '<span class="big-odds-badge">⚡ Big Odds</span>' : ''}
-            <span class="week-badge">${weekLabel(b.week)}</span>
-            ${placedInfo}
-            <span style="font-size:0.75em;color:var(--text-light)">${fmtDate(b.submittedAt)}</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:6px">
+                <span class="week-badge">${weekLabel(b.week)}</span>
+                <span style="opacity:0.7">${fmtDate(b.submittedAt)}</span>
+                ${b.placedBy ? `<span style="opacity:0.6">· placed by ${esc(b.placedBy)}</span>` : ''}
+            </span>
         </div>
         ${actions}
     </div>`;
@@ -1784,13 +1759,21 @@ async function markPlaced(betId) {
         </p>
         ${screenshotHtml}
         <div class="form-group">
-            <label>Odds placed at</label>
-            <input type="text" id="placedOdds" value="${esc(b.oddsPlaced || '')}" placeholder="e.g. 5/2">
-            <p style="font-size:0.78em;color:var(--text-light);margin-top:4px">Enter the actual odds you got</p>
+            <label>Bet type</label>
+            <select id="placedType" onchange="updatePlacedStakeHint()">
+                <option value="single">Single</option>
+                <option value="ew">Each Way</option>
+                <option value="freeBet">Free Bet</option>
+            </select>
         </div>
         <div class="form-group">
-            <label>Actual stake (€) — confirm or adjust</label>
-            <input type="number" id="placedStake" value="${esc(b.stake || '')}" step="0.50" min="0.50" placeholder="e.g. 2.50">
+            <label>Stake per line (€)</label>
+            <input type="number" id="placedStake" value="${esc(b.stake || BET_VALUE)}" step="0.50" min="0.50" oninput="updatePlacedStakeHint()" placeholder="e.g. 2.50">
+            <p style="font-size:0.78em;color:var(--text-light);margin-top:4px" id="placedStakeHint"></p>
+        </div>
+        <div class="form-group">
+            <label>Odds placed at</label>
+            <input type="text" id="placedOdds" value="${esc(b.oddsPlaced || '')}" placeholder="e.g. 5/2">
         </div>
         <div class="form-group">
             <label>Description (optional — e.g. "4-fold acca", "each way")</label>
@@ -1812,16 +1795,36 @@ function closePlacedModal() {
     placingBetId = null;
 }
 
+function updatePlacedStakeHint() {
+    const stake = parseFloat(document.getElementById('placedStake')?.value);
+    const type  = document.getElementById('placedType')?.value;
+    const hint  = document.getElementById('placedStakeHint');
+    if (!hint) return;
+    if (!stake || stake <= 0) { hint.textContent = ''; return; }
+    if (type === 'ew') {
+        hint.textContent = `Each Way — €${stake.toFixed(2)} win + €${stake.toFixed(2)} place = €${(stake * 2).toFixed(2)} total deducted`;
+        hint.style.color = 'var(--text-light)';
+    } else if (type === 'freeBet') {
+        hint.textContent = 'Free Bet — no balance deducted';
+        hint.style.color = 'var(--green-dark)';
+    } else {
+        hint.textContent = `€${stake.toFixed(2)} single`;
+        hint.style.color = 'var(--text-light)';
+    }
+}
+
 async function confirmPlaced() {
     const b = appData.bets[placingBetId];
     if (!b) return;
     const actualOdds  = document.getElementById('placedOdds').value.trim();
     const actualStake = parseFloat(document.getElementById('placedStake').value) || b.stake;
+    const placedType  = document.getElementById('placedType').value;
     const description = document.getElementById('placedDescription').value.trim();
     const updates = {
         [`/bets/${b.id}/status`]:      'placed',
         [`/bets/${b.id}/oddsPlaced`]:  actualOdds,
         [`/bets/${b.id}/stake`]:       actualStake,
+        [`/bets/${b.id}/type`]:        placedType,
         [`/bets/${b.id}/placedBy`]:    currentUser,
         [`/bets/${b.id}/placedAt`]:    Date.now()
     };
@@ -1835,22 +1838,31 @@ function openSettleModal(betId) {
     const b = appData.bets[betId];
     if (!b) return;
     const big = isBigOdds(b.oddsPlaced || b.odds);
+    const isEw = b.type === 'ew';
+    const totalStake = isEw ? b.stake * 2 : b.stake;
     document.getElementById('settleModalContent').innerHTML = `
-        <p style="margin-bottom:16px;font-size:0.9em;color:var(--text-mid)">
-            <strong>${esc(b.user)}</strong> — ${esc(b.selection)} @ ${esc(b.oddsPlaced || b.odds || '—')} (€${b.stake})
+        <p style="margin-bottom:10px;font-size:0.9em;color:var(--text-mid)">
+            <strong>${esc(b.user)}</strong> — ${esc(b.selection)} @ ${esc(b.oddsPlaced || b.odds || '—')}
+        </p>
+        <p style="margin-bottom:16px;font-size:0.85em;color:var(--text-mid)">
+            ${isEw
+                ? `<span class="status-chip chip-ew">EW</span> &nbsp;€${b.stake.toFixed(2)} e/w = <strong>€${totalStake.toFixed(2)} total</strong>`
+                : `💰 Stake: €${b.stake}`}
         </p>
         ${big ? `<div class="alert alert-warning" style="font-size:0.85em">⚡ Big odds bet (${BIG_ODDS_THRESHOLD}/1+) — win earns a bonus bet!</div>` : ''}
         <div class="form-group">
             <label>Result</label>
-            <select id="settleResult">
+            <select id="settleResult" onchange="updateSettleReturnsHint()">
                 <option value="won">Won ✅</option>
                 <option value="lost">Lost ❌</option>
+                ${isEw ? '<option value="ew-place">📍 Placed only (EW — place payout, win part lost)</option>' : ''}
                 <option value="void">Void ⬜</option>
             </select>
         </div>
         <div class="form-group" id="settleReturnGroup">
-            <label>Returns (€ total back incl. stake)</label>
-            <input type="number" id="settleReturns" placeholder="e.g. 17.50" step="0.01" min="0">
+            <label>Returns (€ total received back)</label>
+            <input type="number" id="settleReturns" placeholder="e.g. 17.50" step="0.01" min="0" oninput="updateSettleReturnsHint()">
+            <p style="font-size:0.78em;color:var(--text-light);margin-top:3px" id="settleReturnsHint">${isEw ? `Total stake was €${totalStake.toFixed(2)} — enter whatever came back` : ''}</p>
         </div>
         <div style="display:flex;gap:10px;margin-top:16px">
             <button class="btn btn-gold" onclick="settleBet()">Confirm</button>
@@ -1864,12 +1876,58 @@ function closeSettleModal() {
     settlingBetId = null;
 }
 
+function updateSettleReturnsHint() {
+    const b = appData.bets[settlingBetId];
+    if (!b) return;
+    const result  = document.getElementById('settleResult')?.value;
+    const returns = parseFloat(document.getElementById('settleReturns')?.value) || 0;
+    const hint    = document.getElementById('settleReturnsHint');
+    if (!hint) return;
+    const isEw = b.type === 'ew';
+    const totalStake = isEw ? b.stake * 2 : b.stake;
+
+    if (result === 'lost' || result === 'void') {
+        hint.textContent = result === 'void' ? 'Stake will be refunded to the member.' : '';
+        hint.style.color = 'var(--text-light)';
+        return;
+    }
+    if (returns <= 0) {
+        hint.textContent = isEw ? `Total staked: €${totalStake.toFixed(2)}` : '';
+        hint.style.color = 'var(--text-light)';
+        return;
+    }
+    const profit = (result === 'ew-place' || result === 'won') ? returns - totalStake : 0;
+    const sign = profit >= 0 ? '+' : '';
+    hint.textContent = `Profit: ${sign}€${profit.toFixed(2)}`;
+    hint.style.color = profit >= 0 ? 'var(--green-dark)' : 'var(--red-dark)';
+}
+
 async function settleBet() {
     const b = appData.bets[settlingBetId];
     if (!b) return;
     const result  = document.getElementById('settleResult').value;
     const returns = parseFloat(document.getElementById('settleReturns').value) || 0;
-    const profit  = result === 'won' ? (returns - b.stake) : (result === 'lost' ? -b.stake : 0);
+
+    // EW bets cost stake × 2 total; profit/loss must account for this
+    const isEw = b.type === 'ew';
+    const totalStake = isEw ? b.stake * 2 : b.stake;
+
+    let profit;
+    let settleStatus;
+    if (result === 'won') {
+        // Free bets: returns are pure profit (no stake of your own was risked)
+        profit = b.type === 'freeBet' ? returns : returns - totalStake;
+        settleStatus = 'won';
+    } else if (result === 'ew-place') {
+        profit = b.type === 'freeBet' ? returns : returns - totalStake;
+        settleStatus = profit >= 0 ? 'won' : 'lost';
+    } else if (result === 'lost') {
+        profit = b.type === 'freeBet' ? 0 : -totalStake;
+        settleStatus = 'lost';
+    } else {
+        profit = 0;
+        settleStatus = 'void';
+    }
 
     const user    = appData.users[b.user] || {};
     const balance = getUserBalance(b.user);
@@ -1878,39 +1936,33 @@ async function settleBet() {
     let newBalance = balance;
     let pnlDelta   = 0;
 
-    if (result === 'won') {
-        // Bet is returned + profit
+    if (settleStatus === 'won') {
         newBalance = Math.min(MAX_CARRY, balance + betsNeeded);
-        // Big odds bonus bet — use actual placed odds
         if (isBigOdds(b.oddsPlaced || b.odds)) newBalance = Math.min(MAX_CARRY, newBalance + 1);
         pnlDelta = profit;
-    } else if (result === 'lost') {
-        pnlDelta = -b.stake;
-        // balance already deducted at submit time
-    } else if (result === 'void') {
-        // Refund the bets
+    } else if (settleStatus === 'lost') {
+        pnlDelta = profit; // already negative
+    } else if (settleStatus === 'void') {
         newBalance = Math.min(MAX_CARRY, balance + betsNeeded);
         pnlDelta   = 0;
     }
 
-    const newTotalPnl = (getAllTimePnl(b.user)) + pnlDelta;
+    const newTotalPnl = getAllTimePnl(b.user) + pnlDelta;
 
     const updates = {
-        [`/bets/${b.id}/status`]:  result,
+        [`/bets/${b.id}/status`]:  settleStatus,
         [`/bets/${b.id}/profit`]:  profit,
         [`/bets/${b.id}/returns`]: returns,
         [`/bets/${b.id}/settledAt`]: Date.now(),
         [`/users/${b.user}/betBalance`]: newBalance,
         [`/users/${b.user}/totalPnl`]:   newTotalPnl,
     };
-    if (result === 'won') {
+    if (settleStatus === 'won') {
         updates[`/users/${b.user}/betsWon`] = (user.betsWon || 0) + 1;
     }
     await db.ref('/').update(updates);
 
-    // Delete screenshot from Storage now that bet is settled
     deleteScreenshot(b);
-
     closeSettleModal();
 }
 
@@ -1930,9 +1982,22 @@ async function voidBet(betId) {
     deleteScreenshot(b);
 }
 
-// ══════════════════════════════════════════════════════════════
-//  ADMIN
-// ══════════════════════════════════════════════════════════════
+async function deleteBet(betId) {
+    if (!confirm('Permanently delete this bet? This cannot be undone.')) return;
+    const b = appData.bets[betId];
+    if (!b) return;
+
+    // Refund balance if the bet was still active (pending/placed)
+    if (['pending', 'placed'].includes(b.status) && b.type !== 'freeBet') {
+        const balance    = getUserBalance(b.user);
+        const betsNeeded = Math.ceil(b.stake / BET_VALUE);
+        const newBalance = Math.min(MAX_CARRY, balance + betsNeeded);
+        await db.ref('/users/' + b.user + '/betBalance').set(newBalance);
+    }
+
+    await db.ref('/bets/' + betId).remove();
+    deleteScreenshot(b);
+}
 function showAdminTab(t) {
     adminTab = t;
     ['week','users','import','config'].forEach(x => {
@@ -2135,22 +2200,36 @@ async function addRetroBet() {
     if (!week)      { msg.innerHTML = '<div class="alert alert-error">Please enter a week number.</div>'; return; }
 
     const betId = db.ref('/bets').push().key;
-    const profit = status === 'won' ? (returns - stake) : (status === 'lost' ? -stake : null);
+    const totalStake = type === 'ew' ? stake * 2 : stake;
+    let profit, savedStatus;
+    if (status === 'won') {
+        profit = type === 'freeBet' ? returns : returns - totalStake;
+        savedStatus = 'won';
+    } else if (status === 'ew-place') {
+        profit = returns - totalStake;
+        savedStatus = profit >= 0 ? 'won' : 'lost';
+    } else if (status === 'lost') {
+        profit = type === 'freeBet' ? 0 : -totalStake;
+        savedStatus = 'lost';
+    } else {
+        profit = null;
+        savedStatus = status; // 'placed'
+    }
 
     const bet = {
-        id: betId, user: member, selection, stake, type, status, week,
+        id: betId, user: member, selection, stake, type, status: savedStatus, week,
         submittedAt: Date.now(), placedBy: currentUser, placedAt: Date.now(),
         oddsPlaced: odds, profit,
-        ...(status === 'won' ? { returns } : {})
+        ...(savedStatus === 'won' ? { returns } : {})
     };
 
     const updates = { [`/bets/${betId}`]: bet };
 
     // Update P&L if settled
-    if (status === 'won' || status === 'lost') {
+    if (savedStatus === 'won' || savedStatus === 'lost') {
         const newPnl = getAllTimePnl(member) + (profit || 0);
         updates[`/users/${member}/totalPnl`] = Math.round(newPnl * 100) / 100;
-        if (status === 'won') {
+        if (savedStatus === 'won') {
             updates[`/users/${member}/betsWon`] = (appData.users[member]?.betsWon || 0) + 1;
         }
     }
@@ -2209,7 +2288,12 @@ async function importPpCsv() {
 
         const isWon  = result.includes('won') || result.includes('win') || returns > matchedBet.stake;
         const status = isWon ? 'won' : 'lost';
-        const profit = isWon ? returns - matchedBet.stake : -matchedBet.stake;
+        const isEw = matchedBet.type === 'ew';
+        const isFb = matchedBet.type === 'freeBet';
+        const totalStake = isEw ? matchedBet.stake * 2 : matchedBet.stake;
+        const profit = isWon
+            ? (isFb ? returns : returns - totalStake)
+            : (isFb ? 0 : -totalStake);
 
         const balance    = getUserBalance(matchedBet.user);
         const betsNeeded = Math.ceil(matchedBet.stake / BET_VALUE);
