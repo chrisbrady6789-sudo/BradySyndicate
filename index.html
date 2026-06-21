@@ -915,13 +915,16 @@
         <div class="modal-title">📲 Send to WhatsApp</div>
         <p style="font-size:0.88em;color:var(--text-mid);margin-bottom:10px">Your bet is saved! Now send it to the group:</p>
         <div class="copy-msg-box" id="copyMsgBox"></div>
-        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+        <div id="waScreenshotHint" class="hidden" style="margin-top:10px;font-size:0.82em;color:var(--text-mid)">
+            📸 Image link included in the message — recipients can tap it to view.
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
             <a id="waLink" href="#" target="_blank" class="btn btn-gold" style="text-decoration:none" onclick="onWaClick()">
                 📱 Open WhatsApp
             </a>
             <button class="btn btn-ghost" onclick="copyBetMsg()">📋 Copy text</button>
         </div>
-        <p style="font-size:0.78em;color:var(--text-light);margin-top:10px">Opens WhatsApp with the message ready — just pick the group and hit send.</p>
+        <p style="font-size:0.78em;color:var(--text-light);margin-top:10px">Opens WhatsApp with the message pre-filled — pick the group and hit send.</p>
         <p id="copyConfirm" style="font-size:0.82em;color:var(--green-dark);margin-top:6px;font-weight:600"></p>
     </div>
 </div>
@@ -1460,6 +1463,15 @@ async function submitBet() {
     document.getElementById('copyMsgBox').textContent = waMsg;
     document.getElementById('waLink').href = 'https://wa.me/?text=' + encodeURIComponent(waMsg);
     document.getElementById('copyConfirm').textContent = '';
+
+    // Show screenshot hint if this is a screenshot bet
+    const screenshotHint = document.getElementById('waScreenshotHint');
+    if (screenshotUrl) {
+        screenshotHint.classList.remove('hidden');
+    } else {
+        screenshotHint.classList.add('hidden');
+    }
+
     document.getElementById('waModal').classList.remove('hidden');
 
     // Notify
@@ -1472,7 +1484,7 @@ function closeWaModal() {
 }
 
 function buildWaMessage(bet) {
-    const photoStr = bet.hasScreenshot ? `\n📸 Screenshot attached in app` : '';
+    const photoStr = bet.screenshotUrl ? `\n📸 ${bet.screenshotUrl}` : '';
     return `#betreq\n👤 ${bet.user}\n🎯 ${bet.selection}${photoStr}`;
 }
 
@@ -1553,6 +1565,35 @@ function renderFeed() {
         el.innerHTML = '<p style="color:var(--text-light)">No bets to show.</p>';
         return;
     }
+
+    if (feedFilter === 'all') {
+        // Group by week, most recent first
+        const groups = {};
+        bets.forEach(b => {
+            if (!groups[b.week]) groups[b.week] = [];
+            groups[b.week].push(b);
+        });
+        const weeks = Object.keys(groups).map(Number).sort((a,b) => b - a);
+        el.innerHTML = weeks.map(w => {
+            const weekBets = groups[w];
+            const settled  = weekBets.filter(b => b.status === 'won' || b.status === 'lost');
+            const won      = weekBets.filter(b => b.status === 'won').length;
+            const pnl      = settled.reduce((sum, b) => sum + (parseFloat(b.profit) || 0), 0);
+            const pnlStr   = settled.length ? `<span class="${pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}" style="font-size:0.85em;font-weight:700">${fmtEuro(pnl)}</span>` : '';
+            return `
+                <div style="margin-bottom:6px">
+                    <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:2px solid var(--border);margin-bottom:10px">
+                        <span class="week-badge" style="font-size:0.85em">${weekLabel(w)}</span>
+                        <span style="font-size:0.78em;color:var(--text-light)">${getWeekDates(w)}</span>
+                        <span style="font-size:0.78em;color:var(--text-light);margin-left:4px">${weekBets.length} bet${weekBets.length !== 1 ? 's' : ''} · ${won} won</span>
+                        ${pnlStr}
+                    </div>
+                    ${weekBets.map(b => betCardHtml(b, true)).join('')}
+                </div>`;
+        }).join('');
+        return;
+    }
+
     el.innerHTML = bets.map(b => betCardHtml(b, true)).join('');
 }
 
