@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brady Syndicate</title>
+    <title>Brady Gamblers</title>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
@@ -387,6 +387,77 @@
             font-family: monospace; font-size: 0.9em;
         }
 
+        /* ── COMMENTS ── */
+        .comments-section {
+            border-top: 1px solid var(--border);
+            padding: 10px 14px 12px;
+            background: var(--card-bg);
+        }
+        .comments-toggle {
+            background: none; border: none; cursor: pointer;
+            font-size: 0.8em; color: var(--text-light); font-weight: 600;
+            padding: 0; display: flex; align-items: center; gap: 5px;
+        }
+        .comments-toggle:hover { color: var(--navy-mid); }
+        .comments-list { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+        .comment-item {
+            display: flex; gap: 8px; align-items: flex-start;
+            font-size: 0.85em;
+        }
+        .comment-avatar {
+            width: 26px; height: 26px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--navy-light), var(--navy-mid));
+            color: #fff; font-size: 0.72em; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; margin-top: 1px;
+        }
+        .comment-bubble {
+            background: var(--card-bg2);
+            border: 1px solid var(--border);
+            border-radius: 0 8px 8px 8px;
+            padding: 6px 10px;
+            flex: 1; min-width: 0;
+        }
+        .comment-meta {
+            font-size: 0.78em; color: var(--text-light);
+            display: flex; align-items: center; gap: 6px; margin-bottom: 2px;
+        }
+        .comment-author { font-weight: 700; color: var(--navy-mid); }
+        .comment-text { color: var(--text); word-break: break-word; line-height: 1.4; }
+        .comment-delete {
+            background: none; border: none; cursor: pointer;
+            color: var(--text-light); font-size: 0.85em; padding: 0 2px;
+            opacity: 0; transition: opacity 0.15s;
+        }
+        .comment-item:hover .comment-delete { opacity: 1; }
+        .comment-input-row {
+            display: flex; gap: 7px; margin-top: 10px; align-items: center;
+        }
+        .comment-input {
+            flex: 1; padding: 7px 11px; border: 1.5px solid var(--border);
+            border-radius: 20px; font-size: 0.85em; color: var(--text);
+            background: #fff; outline: none; transition: border-color 0.2s;
+        }
+        .comment-input:focus { border-color: var(--navy-light); }
+        .comment-send {
+            background: var(--navy-mid); color: #fff; border: none;
+            border-radius: 50%; width: 30px; height: 30px; cursor: pointer;
+            font-size: 1em; display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; transition: filter 0.15s;
+        }
+        .comment-send:hover { filter: brightness(1.2); }
+
+        /* ── TOAST ── */
+        .toast {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+            background: #1a2540; color: #fff;
+            padding: 10px 20px; border-radius: 8px; font-size: 0.9em; font-weight: 600;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            opacity: 0; z-index: 2000; white-space: nowrap; pointer-events: none;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
         /* ── RESPONSIVE ── */
         @media (max-width: 600px) {
             .header h1 { font-size: 1.6em; }
@@ -627,12 +698,30 @@
 <div id="feedPage" class="container hidden">
     <div class="card">
         <h2>📋 Bet Feed</h2>
+
+        <!-- Filter chips -->
         <div class="feed-filter" id="feedFilter">
-            <div class="filter-chip active" onclick="setFeedFilter('week')" id="ff-week">This Week</div>
-            <div class="filter-chip" onclick="setFeedFilter('all')" id="ff-all">All Time</div>
-            <div class="filter-chip" onclick="setFeedFilter('mine')" id="ff-mine">Mine Only</div>
-            <div class="filter-chip" onclick="setFeedFilter('pending')" id="ff-pending">Pending</div>
+            <div class="filter-chip active" onclick="setFeedFilter('week')"    id="ff-week">This Week</div>
+            <div class="filter-chip"        onclick="setFeedFilter('all')"     id="ff-all">All Time</div>
+            <div class="filter-chip"        onclick="setFeedFilter('mine')"    id="ff-mine">Mine Only</div>
+            <div class="filter-chip"        onclick="setFeedFilter('pending')" id="ff-pending">Pending</div>
+            <div class="filter-chip"        onclick="setFeedFilter('won')"     id="ff-won">Winners</div>
         </div>
+
+        <!-- Sort + member filter row -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+            <select id="feedMemberFilter" onchange="renderFeed()" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:0.85em;color:var(--text);background:#fff;cursor:pointer">
+                <option value="">👤 All members</option>
+            </select>
+            <select id="feedSort" onchange="renderFeed()" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:0.85em;color:var(--text);background:#fff;cursor:pointer">
+                <option value="newest">🕐 Newest first</option>
+                <option value="oldest">🕐 Oldest first</option>
+                <option value="settled">🏁 Recently settled</option>
+                <option value="profit_desc">💰 Biggest win</option>
+                <option value="profit_asc">💸 Biggest loss</option>
+            </select>
+        </div>
+
         <div id="feedContainer"></div>
     </div>
 </div>
@@ -894,7 +983,7 @@
                 </div>
             </div>
             <button class="btn" onclick="savePin()">Update PIN</button>
-            <div id="pinMsg" style="margin-top:8px"></div>
+            <div id="pinMsgAdmin" style="margin-top:8px"></div>
         </div>
     </div>
 </div>
@@ -926,6 +1015,29 @@
         </div>
         <p style="font-size:0.78em;color:var(--text-light);margin-top:10px">Opens WhatsApp with the message pre-filled — pick the group and hit send.</p>
         <p id="copyConfirm" style="font-size:0.82em;color:var(--green-dark);margin-top:6px;font-weight:600"></p>
+    </div>
+</div>
+
+<!-- Edit Bet modal (admin) -->
+<div id="editBetModal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeEditBetModal()">×</button>
+        <div class="modal-title">✏️ Edit Bet</div>
+        <div id="editBetModalContent"></div>
+    </div>
+</div>
+
+<!-- Share modal -->
+<div id="shareModal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeShareModal()">×</button>
+        <div class="modal-title">🔗 Share Bet</div>
+        <div class="copy-msg-box" id="shareMsgBox"></div>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+            <a id="shareWaLink" href="#" target="_blank" class="btn btn-gold" style="text-decoration:none">📱 Share on WhatsApp</a>
+            <button class="btn btn-ghost" onclick="copyShareMsg()">📋 Copy text</button>
+        </div>
+        <p id="shareCopyConfirm" style="font-size:0.82em;color:var(--green-dark);margin-top:6px;font-weight:600"></p>
     </div>
 </div>
 
@@ -1002,11 +1114,12 @@ let currentUser  = null;
 let isAdmin      = false;
 let isPlacer     = false;
 let currentPage  = 'dashboard';
-let appData      = { bets: {}, users: {}, weeks: {}, config: {} };
+let appData      = { bets: {}, users: {}, weeks: {}, config: {}, comments: {} };
 let currentWeek  = 1;
 let lbView       = 'week';
 let queueTab     = 'pending';
 let feedFilter   = 'week';
+let feedSort     = 'newest';
 let adminTab     = 'week';
 let settlingBetId = null;
 let placingBetId  = null;
@@ -1088,12 +1201,17 @@ function startApp() {
     const sel = document.getElementById('freeBetOverride');
     MEMBERS.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o); });
 
+    // Populate feed member filter
+    const mf = document.getElementById('feedMemberFilter');
+    MEMBERS.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; mf.appendChild(o); });
+
     db.ref('/').on('value', snap => {
         const d = snap.val() || {};
-        appData.bets   = d.bets   || {};
-        appData.users  = d.users  || {};
-        appData.weeks  = d.weeks  || {};
-        appData.config = d.config || {};
+        appData.bets   = d.bets     || {};
+        appData.users  = d.users   || {};
+        appData.weeks  = d.weeks   || {};
+        appData.config = d.config  || {};
+        appData.comments = d.comments || {};
         currentWeek    = d.currentWeek || 1;
 
         // Pull notification config from Firebase
@@ -1485,7 +1603,8 @@ function closeWaModal() {
 
 function buildWaMessage(bet) {
     const photoStr = bet.screenshotUrl ? `\n📸 ${bet.screenshotUrl}` : '';
-    return `#betreq\n👤 ${bet.user}\n🎯 ${bet.selection}${photoStr}`;
+    const appUrl = globalThis.location.href.split('?')[0];
+    return `#betreq\n👤 ${bet.user}\n🎯 ${bet.selection}${photoStr}\n🔗 ${appUrl}`;
 }
 
 function onWaClick() {
@@ -1546,27 +1665,49 @@ function clearFeedBadge() {
 // ══════════════════════════════════════════════════════════════
 function setFeedFilter(f) {
     feedFilter = f;
-    ['week','all','mine','pending'].forEach(x => {
+    ['week','all','mine','pending','won'].forEach(x => {
         document.getElementById('ff-' + x)?.classList.toggle('active', x === f);
     });
     renderFeed();
 }
 
+function applyFeedSort(bets) {
+    const s = document.getElementById('feedSort')?.value || 'newest';
+    feedSort = s;
+    const arr = [...bets];
+    if (s === 'newest')       return arr.sort((a,b) => b.submittedAt - a.submittedAt);
+    if (s === 'oldest')       return arr.sort((a,b) => a.submittedAt - b.submittedAt);
+    if (s === 'settled')      return arr.sort((a,b) => (b.settledAt||0) - (a.settledAt||0));
+    if (s === 'profit_desc')  return arr.sort((a,b) => (Number.parseFloat(b.profit)||0) - (Number.parseFloat(a.profit)||0));
+    if (s === 'profit_asc')   return arr.sort((a,b) => (Number.parseFloat(a.profit)||0) - (Number.parseFloat(b.profit)||0));
+    return arr;
+}
+
 function renderFeed() {
     clearFeedBadge();
     const el = document.getElementById('feedContainer');
-    let bets = Object.values(appData.bets).sort((a,b) => b.submittedAt - a.submittedAt);
+    const memberFilter = document.getElementById('feedMemberFilter')?.value || '';
 
+    let bets = Object.values(appData.bets);
+
+    // Apply tab filter
     if (feedFilter === 'week')    bets = bets.filter(b => b.week === currentWeek);
     if (feedFilter === 'mine')    bets = bets.filter(b => b.user === currentUser);
     if (feedFilter === 'pending') bets = bets.filter(b => b.status === 'pending');
+    if (feedFilter === 'won')     bets = bets.filter(b => b.status === 'won');
+
+    // Apply member filter
+    if (memberFilter) bets = bets.filter(b => b.user === memberFilter);
+
+    // Apply sort
+    bets = applyFeedSort(bets);
 
     if (!bets.length) {
         el.innerHTML = '<p style="color:var(--text-light)">No bets to show.</p>';
         return;
     }
 
-    if (feedFilter === 'all') {
+    if (feedFilter === 'all' && !memberFilter) {
         // Group by week, most recent first
         const groups = {};
         bets.forEach(b => {
@@ -1578,7 +1719,7 @@ function renderFeed() {
             const weekBets = groups[w];
             const settled  = weekBets.filter(b => b.status === 'won' || b.status === 'lost');
             const won      = weekBets.filter(b => b.status === 'won').length;
-            const pnl      = settled.reduce((sum, b) => sum + (parseFloat(b.profit) || 0), 0);
+            const pnl      = settled.reduce((sum, b) => sum + (Number.parseFloat(b.profit) || 0), 0);
             const pnlStr   = settled.length ? `<span class="${pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}" style="font-size:0.85em;font-weight:700">${fmtEuro(pnl)}</span>` : '';
             return `
                 <div style="margin-bottom:6px">
@@ -1714,42 +1855,58 @@ function renderQueue() {
 // ══════════════════════════════════════════════════════════════
 //  BET CARD HTML
 // ══════════════════════════════════════════════════════════════
+function betProfitHtml(b) {
+    if (b.status === 'won' && b.profit != null) {
+        return `<span class="bet-profit-large pnl-pos">+€${Number.parseFloat(b.profit).toFixed(2)}</span>`;
+    }
+    if (b.status === 'lost') {
+        const isEw = b.type === 'ew';
+        const isFb = b.type === 'freeBet';
+        const total = isEw ? (Number.parseFloat(b.stake) * 2).toFixed(2) : Number.parseFloat(b.stake).toFixed(2);
+        const lossDisplay = isFb ? '€0' : `-€${total}`;
+        return `<span class="bet-profit-large pnl-neg">${lossDisplay}</span>`;
+    }
+    return '';
+}
+
+function betOddsDisplay(b) {
+    if (b.oddsPlaced && b.oddsPlaced !== b.odds) {
+        return `<span style="text-decoration:line-through;opacity:0.5">${esc(b.odds)}</span> → <strong>${esc(b.oddsPlaced)}</strong>`;
+    }
+    return esc(b.oddsPlaced || b.odds || '');
+}
+
+function betScreenshotHtml(b) {
+    if (!b.screenshotUrl || !(b.user === currentUser || isPlacer || isAdmin)) return '';
+    return `<div style="padding:10px 14px 0"><div style="margin:10px 0 4px">
+        <a href="${esc(b.screenshotUrl)}" target="_blank" rel="noopener">
+            <img src="${esc(b.screenshotUrl)}" alt="Bet screenshot"
+                style="max-width:100%;max-height:220px;border-radius:8px;object-fit:contain;border:1px solid var(--border);cursor:zoom-in">
+        </a>
+        <div style="font-size:0.75em;color:var(--text-light);margin-top:3px">📸 Tap to open full size</div>
+    </div></div>`;
+}
+
+function betActionsHtml(b, showActions) {
+    if (!showActions || !(isPlacer || isAdmin)) return '';
+    const isActive = ['pending', 'placed'].includes(b.status);
+    const placedBtn  = b.status === 'pending' ? `<button class="btn btn-sm btn-green" onclick="markPlaced('${b.id}')">✅ Mark Placed</button>` : '';
+    const settleBtn  = b.status === 'placed'  ? `<button class="btn btn-sm btn-gold"  onclick="openSettleModal('${b.id}')">🏁 Settle</button>` : '';
+    const editBtn    = isActive ? `<button class="btn btn-sm" style="background:var(--navy-light);color:#fff" onclick="openEditBetModal('${b.id}')">✏️ Edit</button>` : '';
+    const voidBtn    = isActive ? `<button class="btn btn-sm btn-red" onclick="voidBet('${b.id}')">⬜ Void</button>` : '';
+    const deleteBtn  = isAdmin  ? `<button class="btn btn-sm" style="background:#6b7280;color:#fff" onclick="deleteBet('${b.id}')">🗑 Delete</button>` : '';
+    return `<div class="bet-actions">${placedBtn}${settleBtn}${editBtn}${voidBtn}${deleteBtn}</div>`;
+}
+
 function betCardHtml(b, showUser, showActions) {
     const isMine = b.user === currentUser;
-    const big = isBigOdds(b.oddsPlaced || b.odds);
-    const isEw = b.type === 'ew';
-    const isFb = b.type === 'freeBet';
-    const totalStakeDisplay = isEw ? (parseFloat(b.stake) * 2).toFixed(2) : parseFloat(b.stake).toFixed(2);
-    const lossDisplay = isFb ? '€0' : `-€${totalStakeDisplay}`;
-
-    const profitStr = b.status === 'won' && b.profit != null
-        ? `<span class="bet-profit-large pnl-pos">+€${parseFloat(b.profit).toFixed(2)}</span>`
-        : b.status === 'lost'
-        ? `<span class="bet-profit-large pnl-neg">${lossDisplay}</span>`
-        : '';
-
-    const oddsDisplay = b.oddsPlaced && b.oddsPlaced !== b.odds
-        ? `<span style="text-decoration:line-through;opacity:0.5">${esc(b.odds)}</span> → <strong>${esc(b.oddsPlaced)}</strong>`
-        : (b.oddsPlaced || b.odds || '');
-
-    const canSeeScreenshot = isMine || isPlacer || isAdmin;
-    const screenshotHtml = (b.screenshotUrl && canSeeScreenshot)
-        ? `<div style="margin:10px 0 4px">
-               <a href="${esc(b.screenshotUrl)}" target="_blank" rel="noopener">
-                   <img src="${esc(b.screenshotUrl)}" alt="Bet screenshot"
-                       style="max-width:100%;max-height:220px;border-radius:8px;object-fit:contain;border:1px solid var(--border);cursor:zoom-in">
-               </a>
-               <div style="font-size:0.75em;color:var(--text-light);margin-top:3px">📸 Tap to open full size</div>
-           </div>`
-        : '';
-
-    const actions = showActions && (isPlacer || isAdmin) ? `
-        <div class="bet-actions">
-            ${b.status === 'pending' ? `<button class="btn btn-sm btn-green" onclick="markPlaced('${b.id}')">✅ Mark Placed</button>` : ''}
-            ${b.status === 'placed'  ? `<button class="btn btn-sm btn-gold"  onclick="openSettleModal('${b.id}')">🏁 Settle</button>` : ''}
-            ${['pending','placed'].includes(b.status) ? `<button class="btn btn-sm btn-red" onclick="voidBet('${b.id}')">⬜ Void</button>` : ''}
-            ${isAdmin ? `<button class="btn btn-sm" style="background:#6b7280;color:#fff" onclick="deleteBet('${b.id}')">🗑 Delete</button>` : ''}
-        </div>` : '';
+    const isEw   = b.type === 'ew';
+    const isFb   = b.type === 'freeBet';
+    const big    = isBigOdds(b.oddsPlaced || b.odds);
+    const totalStakeDisplay = isEw
+        ? (Number.parseFloat(b.stake) * 2).toFixed(2)
+        : Number.parseFloat(b.stake).toFixed(2);
+    const oddsDisplay = betOddsDisplay(b);
 
     return `<div class="bet-card ${isMine ? 'mine' : ''} ${b.status === 'won' ? 'won' : ''}">
         <div class="bet-card-header">
@@ -1760,13 +1917,14 @@ function betCardHtml(b, showUser, showActions) {
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
                 ${statusChip(b.status)}
-                ${profitStr}
+                ${betProfitHtml(b)}
+                <button class="btn btn-sm btn-ghost" style="font-size:0.72em;padding:3px 8px" onclick="openShareModal('${b.id}')">🔗 Share</button>
             </div>
         </div>
-        ${screenshotHtml ? `<div style="padding:10px 14px 0">${screenshotHtml}</div>` : ''}
+        ${betScreenshotHtml(b)}
         <div class="bet-card-footer">
             ${oddsDisplay ? `<span style="font-weight:600;color:var(--text-mid)">@ ${oddsDisplay}</span><span class="bet-card-footer-sep">·</span>` : ''}
-            <span>💰 ${isEw ? `€${parseFloat(b.stake).toFixed(2)} e/w (€${totalStakeDisplay} total)` : `€${totalStakeDisplay}`}</span>
+            <span>💰 ${isEw ? `€${Number.parseFloat(b.stake).toFixed(2)} e/w (€${totalStakeDisplay} total)` : `€${totalStakeDisplay}`}</span>
             ${isFb ? '<span class="status-chip chip-freeBet" style="font-size:0.7em">🎁 Free Bet</span>' : ''}
             ${big ? '<span class="big-odds-badge">⚡ Big Odds</span>' : ''}
             <span style="margin-left:auto;display:flex;align-items:center;gap:6px">
@@ -1775,7 +1933,10 @@ function betCardHtml(b, showUser, showActions) {
                 ${b.placedBy ? `<span style="opacity:0.6">· placed by ${esc(b.placedBy)}</span>` : ''}
             </span>
         </div>
-        ${actions}
+        ${betActionsHtml(b, showActions)}
+        <div class="comments-section" id="comments-section-${b.id}">
+            ${commentsHtml(b.id)}
+        </div>
     </div>`;
 }
 
@@ -2007,6 +2168,72 @@ async function settleBet() {
     closeSettleModal();
 }
 
+// ══════════════════════════════════════════════════════════════
+//  EDIT BET (admin — adjust odds/stake after placing)
+// ══════════════════════════════════════════════════════════════
+let editingBetId = null;
+
+function openEditBetModal(betId) {
+    editingBetId = betId;
+    const b = appData.bets[betId];
+    if (!b) return;
+    document.getElementById('editBetModalContent').innerHTML = `
+        <p style="margin-bottom:14px;font-size:0.9em;color:var(--text-mid)">
+            <strong>${esc(b.user)}</strong> — ${esc(b.selection)}
+        </p>
+        <div class="form-group">
+            <label>Bet type</label>
+            <select id="editBetType">
+                <option value="single" ${b.type === 'single' ? 'selected' : ''}>Single</option>
+                <option value="ew"     ${b.type === 'ew'     ? 'selected' : ''}>Each Way</option>
+                <option value="freeBet"${b.type === 'freeBet'? 'selected' : ''}>Free Bet</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Stake per line (€)</label>
+            <input type="number" id="editBetStake" value="${esc(b.stake)}" step="0.50" min="0.50">
+        </div>
+        <div class="form-group">
+            <label>Odds</label>
+            <input type="text" id="editBetOdds" value="${esc(b.oddsPlaced || b.odds || '')}" placeholder="e.g. 5/2">
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="editBetDescription" value="${esc(b.description || '')}" placeholder="e.g. 4-fold acca, EW">
+        </div>
+        <div class="alert alert-info" style="font-size:0.82em;margin-bottom:12px">
+            ℹ️ Changing stake does <strong>not</strong> adjust the member's balance — do that manually in Admin → Users if needed.
+        </div>
+        <div style="display:flex;gap:10px;margin-top:4px">
+            <button class="btn btn-gold" onclick="confirmEditBet()">💾 Save Changes</button>
+            <button class="btn btn-ghost" onclick="closeEditBetModal()">Cancel</button>
+        </div>`;
+    document.getElementById('editBetModal').classList.remove('hidden');
+}
+
+function closeEditBetModal() {
+    document.getElementById('editBetModal').classList.add('hidden');
+    editingBetId = null;
+}
+
+async function confirmEditBet() {
+    const b = appData.bets[editingBetId];
+    if (!b) return;
+    const type        = document.getElementById('editBetType').value;
+    const stake       = Number.parseFloat(document.getElementById('editBetStake').value) || b.stake;
+    const odds        = document.getElementById('editBetOdds').value.trim();
+    const description = document.getElementById('editBetDescription').value.trim();
+    const updates = {
+        [`/bets/${b.id}/type`]:  type,
+        [`/bets/${b.id}/stake`]: stake,
+    };
+    if (odds)        updates[`/bets/${b.id}/oddsPlaced`]   = odds;
+    if (description) updates[`/bets/${b.id}/description`]  = description;
+    await db.ref('/').update(updates);
+    closeEditBetModal();
+    showToast('Bet updated ✅');
+}
+
 async function voidBet(betId) {
     if (!confirm('Void this bet and refund the stake?')) return;
     const b = appData.bets[betId];
@@ -2180,17 +2407,19 @@ async function saveConfig() {
 }
 
 async function savePin() {
-    // Reads from whichever card is visible
     const p1id = isAdmin ? 'newPinAdmin' : 'newPin';
     const p2id = isAdmin ? 'newPin2Admin' : 'newPin2';
+    const msgId = isAdmin ? 'pinMsgAdmin' : 'pinMsg';
     const p1  = document.getElementById(p1id).value;
     const p2  = document.getElementById(p2id).value;
-    const msg = document.getElementById('pinMsg');
+    const msg = document.getElementById(msgId);
     if (p1.length !== 4 || !/^\d+$/.test(p1)) { msg.innerHTML = '<div class="alert alert-error">PIN must be 4 digits.</div>'; return; }
     if (p1 !== p2) { msg.innerHTML = '<div class="alert alert-error">PINs do not match.</div>'; return; }
     await db.ref('/users/' + currentUser + '/pin').set(p1);
-    msg.innerHTML = '<div class="alert alert-success">PIN updated.</div>';
-    setTimeout(() => msg.innerHTML = '', 3000);
+    document.getElementById(p1id).value = '';
+    document.getElementById(p2id).value = '';
+    msg.innerHTML = '';
+    showToast('🔒 PIN updated successfully!');
 }
 
 async function advanceWeek() {
@@ -2497,6 +2726,161 @@ async function sendEmailNotification(bet) {
     } catch (e) {
         console.error('EmailJS error:', e);
     }
+}
+// ══════════════════════════════════════════════════════════════
+//  COMMENTS
+// ══════════════════════════════════════════════════════════════
+function commentsHtml(betId) {
+    const comments = Object.values(appData.comments[betId] || {})
+        .sort((a, b) => a.ts - b.ts);
+    const count = comments.length;
+
+    const listHtml = count ? comments.map(c => {
+        const initials = c.user.slice(0, 2).toUpperCase();
+        const canDelete = c.user === currentUser || isAdmin;
+        const deleteBtn = canDelete
+            ? `<button class="comment-delete" title="Delete" onclick="deleteComment('${betId}','${c.id}')">✕</button>`
+            : '';
+        return `<div class="comment-item">
+            <div class="comment-avatar">${esc(initials)}</div>
+            <div class="comment-bubble">
+                <div class="comment-meta">
+                    <span class="comment-author">${esc(c.user)}</span>
+                    <span>${fmtDate(c.ts)}</span>
+                    ${deleteBtn}
+                </div>
+                <div class="comment-text">${esc(c.text)}</div>
+            </div>
+        </div>`;
+    }).join('') : '<p style="font-size:0.82em;color:var(--text-light);margin:6px 0 0">No comments yet.</p>';
+
+    const plural    = count === 1 ? '' : 's';
+    const labelText = count ? `💬 ${count} comment${plural}` : '💬 Add a comment';
+
+    return `<button class="comments-toggle" onclick="toggleComments('${betId}')" id="ctoggle-${betId}">
+        ${labelText} <span id="ctoggle-arrow-${betId}" style="transition:transform 0.2s">▾</span>
+    </button>
+    <div id="clist-${betId}" class="hidden">
+        <div class="comments-list" id="comments-list-${betId}">${listHtml}</div>
+        <div class="comment-input-row">
+            <input class="comment-input" id="cinput-${betId}" placeholder="Write a comment…" maxlength="300"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();postComment('${betId}')}">
+            <button class="comment-send" onclick="postComment('${betId}')">➤</button>
+        </div>
+    </div>`;
+}
+
+function toggleComments(betId) {
+    const list  = document.getElementById('clist-' + betId);
+    const arrow = document.getElementById('ctoggle-arrow-' + betId);
+    if (!list) return;
+    const open = list.classList.toggle('hidden');
+    if (arrow) arrow.style.transform = open ? '' : 'rotate(180deg)';
+    if (!open) {
+        // Focus the input when opening
+        setTimeout(() => document.getElementById('cinput-' + betId)?.focus(), 50);
+    }
+}
+
+async function postComment(betId) {
+    const input = document.getElementById('cinput-' + betId);
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+
+    const commentId = db.ref('/comments/' + betId).push().key;
+    const comment = { id: commentId, betId, user: currentUser, text, ts: Date.now() };
+    await db.ref(`/comments/${betId}/${commentId}`).set(comment);
+    input.value = '';
+    // Firebase listener will re-render the page, but patch the section immediately for snappiness
+    patchCommentSection(betId);
+}
+
+async function deleteComment(betId, commentId) {
+    await db.ref(`/comments/${betId}/${commentId}`).remove();
+    patchCommentSection(betId);
+}
+
+function patchCommentSection(betId) {
+    const section = document.getElementById('comments-section-' + betId);
+    if (!section) return;
+    // Preserve open/closed state
+    const wasOpen = document.getElementById('clist-' + betId) && !document.getElementById('clist-' + betId).classList.contains('hidden');
+    section.innerHTML = commentsHtml(betId);
+    if (wasOpen) {
+        const list  = document.getElementById('clist-' + betId);
+        const arrow = document.getElementById('ctoggle-arrow-' + betId);
+        if (list)  list.classList.remove('hidden');
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SHARE MODAL
+// ══════════════════════════════════════════════════════════════
+function buildShareText(b) {
+    const statusLabels = { won: '✅ WON', lost: '❌ Lost', placed: '🔵 Placed', pending: '🟡 Pending', void: '⬜ Void' };
+    const statusLabel = statusLabels[b.status] || b.status;
+    const isEw  = b.type === 'ew';
+    const isFb  = b.type === 'freeBet';
+    const total = isEw
+        ? (Number.parseFloat(b.stake) * 2).toFixed(2)
+        : Number.parseFloat(b.stake).toFixed(2);
+    const stakeStr = isFb ? '🎁 Free Bet' : (isEw ? `€${Number.parseFloat(b.stake).toFixed(2)} e/w (€${total} total)` : `€${total}`);
+
+    let lines = [
+        `🎯 Brady Syndicate — ${statusLabel}`,
+        `👤 ${b.user}  |  ${weekLabel(b.week)}`,
+        `📋 ${b.selection}`,
+    ];
+    if (b.oddsPlaced || b.odds) lines.push(`📊 Odds: ${b.oddsPlaced || b.odds}  💰 Stake: ${stakeStr}`);
+    if (b.status === 'won' && b.profit != null) {
+        lines.push(`🏆 Profit: +€${Number.parseFloat(b.profit).toFixed(2)}`);
+    }
+    return lines.join('\n');
+}
+
+function openShareModal(betId) {
+    const b = appData.bets[betId];
+    if (!b) return;
+    const text = buildShareText(b);
+    document.getElementById('shareMsgBox').textContent = text;
+    document.getElementById('shareWaLink').href = 'https://wa.me/?text=' + encodeURIComponent(text);
+    document.getElementById('shareCopyConfirm').textContent = '';
+    document.getElementById('shareModal').classList.remove('hidden');
+}
+
+function closeShareModal() {
+    document.getElementById('shareModal').classList.add('hidden');
+}
+
+function copyShareMsg() {
+    const text = document.getElementById('shareMsgBox').textContent;
+    const confirm = document.getElementById('shareCopyConfirm');
+    navigator.clipboard.writeText(text).then(() => {
+        confirm.textContent = '✅ Copied!';
+    }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        confirm.textContent = '✅ Copied!';
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════════════════════
+function showToast(msg, duration = 2500) {
+    let t = document.getElementById('appToast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'appToast';
+        t.className = 'toast';
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), duration);
 }
 
 </script>
