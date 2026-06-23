@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brady Gamblers</title>
+    <title>Brady Syndicate</title>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
@@ -387,6 +387,50 @@
             font-family: monospace; font-size: 0.9em;
         }
 
+        /* ── FEATURE TOGGLES ── */
+        .feature-toggle-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 0; border-bottom: 1px solid var(--border);
+        }
+        .feature-toggle-row:last-child { border-bottom: none; }
+        .feature-toggle-label { font-size: 0.9em; color: var(--text); }
+        .feature-toggle-label small { display: block; font-size: 0.8em; color: var(--text-light); margin-top: 2px; }
+        .toggle-switch { position: relative; display: inline-block; width: 42px; height: 24px; flex-shrink: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; cursor: pointer; inset: 0;
+            background: #cbd5e0; border-radius: 24px; transition: background 0.2s;
+        }
+        .toggle-slider::before {
+            content: ''; position: absolute;
+            width: 18px; height: 18px; left: 3px; bottom: 3px;
+            background: #fff; border-radius: 50%; transition: transform 0.2s;
+        }
+        .toggle-switch input:checked + .toggle-slider { background: var(--green); }
+        .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+        /* ── FREE BETS LIST ── */
+        .free-bet-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 12px; border-radius: 8px;
+            background: #fffbeb; border: 1.5px solid #fcd34d;
+            margin-bottom: 7px;
+        }
+        .free-bet-item .fbi-amount {
+            font-size: 1.05em; font-weight: 900; color: #92400e; white-space: nowrap;
+        }
+        .free-bet-item .fbi-desc {
+            flex: 1; font-size: 0.85em; color: var(--text-mid); min-width: 0;
+        }
+        .free-bet-item .fbi-who {
+            font-size: 0.75em; color: var(--text-light); white-space: nowrap;
+        }
+        .free-bet-item .fbi-del {
+            background: none; border: none; cursor: pointer; color: #ef4444;
+            font-size: 1em; padding: 0 2px; flex-shrink: 0; opacity: 0.6; transition: opacity 0.15s;
+        }
+        .free-bet-item .fbi-del:hover { opacity: 1; }
+
         /* ── COMMENTS ── */
         .comments-section {
             border-top: 1px solid var(--border);
@@ -562,6 +606,7 @@
                     <option>Keith</option><option>Fran</option><option>Shane</option>
                     <option>Jack</option><option>Luke</option><option>Jason</option>
                     <option>Liv</option><option>Chris</option><option>Liam</option><option>Paddy</option>
+                    <option>Group</option>
                 </select>
             </div>
             <div class="form-group">
@@ -615,12 +660,8 @@
 ══════════════════════════════════════ -->
 <div id="dashboardPage" class="container hidden">
 
-    <div id="freeBetBanner" class="free-bet-banner hidden">
-        <div class="free-bet-icon">🎁</div>
-        <div class="free-bet-text">
-            <strong id="freeBetHolder"></strong>
-            <span>holds the free bet &amp; promos this week — top tipster from last week</span>
-        </div>
+    <div id="freeBetBanner" class="hidden" style="margin-bottom:20px">
+        <div id="freeBetList"></div>
     </div>
 
     <div id="activityWarning" class="activity-warn hidden"></div>
@@ -704,7 +745,8 @@
             <div class="filter-chip active" onclick="setFeedFilter('week')"    id="ff-week">This Week</div>
             <div class="filter-chip"        onclick="setFeedFilter('all')"     id="ff-all">All Time</div>
             <div class="filter-chip"        onclick="setFeedFilter('mine')"    id="ff-mine">Mine Only</div>
-            <div class="filter-chip"        onclick="setFeedFilter('pending')" id="ff-pending">Pending</div>
+            <div class="filter-chip"        onclick="setFeedFilter('pending')" id="ff-pending">Unplaced</div>
+            <div class="filter-chip"        onclick="setFeedFilter('placed')"  id="ff-placed">Awaiting Result</div>
             <div class="filter-chip"        onclick="setFeedFilter('won')"     id="ff-won">Winners</div>
         </div>
 
@@ -740,6 +782,11 @@
             <button class="btn btn-sm" id="lbViewWeek" onclick="setLbView('week')" style="background:var(--navy-mid);color:#fff">This Week</button>
         </div>
         <div id="lbContainer"></div>
+    </div>
+
+    <div class="card" style="border-color:var(--gold)">
+        <h2>👥 Group Account</h2>
+        <div id="groupCard"></div>
     </div>
 
     <div class="card">
@@ -929,6 +976,14 @@
 
         <!-- Config tab -->
         <div id="adminTab-config" class="hidden">
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <h3>🔌 Feature Visibility</h3>
+            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:14px">Toggle features on or off for all users. Changes take effect immediately.</p>
+            <div id="featureToggles"></div>
+            <button class="btn btn-gold" onclick="saveFeatureToggles()">Save</button>
+            <div id="featureToggleMsg" style="margin-top:10px"></div>
+
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
             <h3>Syndicate Settings</h3>
             <div class="form-row form-row-2">
                 <div class="form-group">
@@ -942,6 +997,41 @@
             </div>
             <button class="btn btn-gold" onclick="saveSyndicateSettings()">Save Settings</button>
             <div id="cfgSettingsMsg" style="margin-top:10px"></div>
+
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <h3>🎁 Free Bets</h3>
+            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:12px">Add a free bet when PP awards one. Each entry shows up on the dashboard and in the Group card. Remove it when it's been used or expired.</p>
+            <div id="adminFreeBetList" style="margin-bottom:14px"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+                <div class="form-group" style="margin:0;flex:0 0 80px">
+                    <label>Amount (€)</label>
+                    <input type="number" id="fbAmount" step="0.50" min="0.50" placeholder="5">
+                </div>
+                <div class="form-group" style="margin:0;flex:1;min-width:160px">
+                    <label>Description / restriction</label>
+                    <input type="text" id="fbDescription" placeholder="e.g. England vs Ghana only, any sport, horse racing">
+                </div>
+                <div class="form-group" style="margin:0;flex:0 0 120px">
+                    <label>Assigned to</label>
+                    <select id="fbAssignedTo">
+                        <option value="">Anyone</option>
+                    </select>
+                </div>
+                <button class="btn btn-gold" style="margin-bottom:14px" onclick="addFreeBet()">➕ Add</button>
+            </div>
+            <div id="fbMsg" style="margin-top:4px"></div>
+
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <h3>PaddyPower Account Balance</h3>
+            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:12px">Override the live PP balance if it gets out of sync — e.g. after a manual deposit, withdrawal, or bonus credit.</p>
+            <div class="form-row form-row-2">
+                <div class="form-group">
+                    <label>Cash balance (€)</label>
+                    <input type="number" id="cfgPpBalance" step="0.01" placeholder="e.g. 466.03">
+                </div>
+            </div>
+            <button class="btn btn-gold" onclick="savePpBalance()">Save PP Balance</button>
+            <div id="cfgPpMsg" style="margin-top:10px"></div>
 
             <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
             <h3>Notification Config</h3>
@@ -1083,6 +1173,8 @@ let PLACER_EMAILS    = [];
 //  CONSTANTS & MEMBERS
 // ══════════════════════════════════════════════════════════════
 const MEMBERS = ['Keith','Fran','Shane','Jack','Luke','Jason','Liv','Chris','Liam','Paddy'];
+const GROUP_MEMBER = 'Group';  // group account — tracked separately from individual rankings
+const ALL_USERS  = [...MEMBERS, GROUP_MEMBER];
 const PLACERS = ['Chris','Fran','Jason'];  // access to queue + admin tools
 const ADMINS  = ['Chris','Fran','Jason'];  // same — all three are admins
 
@@ -1092,6 +1184,11 @@ const MAX_CARRY         = 4;   // max bets you can hold at once
 const BIG_ODDS_THRESHOLD = 10; // win at 10/1+ → earn bonus bet
 const INITIAL_BETS      = 4;   // each member starts with 4 bets (20€)
 const ACTIVITY_WEEKS    = 2;   // must place 1 bet every N weeks
+
+// PP account seed values (set once; all changes flow from bets after this)
+const PP_BALANCE_SEED      = 466.03;
+const PP_FREE_BET_SEED     = 5;
+const GROUP_PNL_SEED       = 86.41;  // Group all-time P&L starting point
 
 const CLOUDINARY_CLOUD  = 'dfbtotwyr';
 const CLOUDINARY_PRESET = 'syndicate';
@@ -1199,18 +1296,22 @@ function startApp() {
 
     // Populate free-bet override dropdown
     const sel = document.getElementById('freeBetOverride');
-    MEMBERS.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o); });
+    ALL_USERS.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o); });
 
     // Populate feed member filter
     const mf = document.getElementById('feedMemberFilter');
-    MEMBERS.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; mf.appendChild(o); });
+    ALL_USERS.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; mf.appendChild(o); });
+
+    // Populate free bet "assigned to" dropdown
+    const fbSel2 = document.getElementById('fbAssignedTo');
+    ALL_USERS.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; fbSel2.appendChild(o); });
 
     db.ref('/').on('value', snap => {
         const d = snap.val() || {};
-        appData.bets   = d.bets     || {};
-        appData.users  = d.users   || {};
-        appData.weeks  = d.weeks   || {};
-        appData.config = d.config  || {};
+        appData.bets     = d.bets     || {};
+        appData.users    = d.users    || {};
+        appData.weeks    = d.weeks    || {};
+        appData.config   = d.config   || {};
         appData.comments = d.comments || {};
         currentWeek    = d.currentWeek || 1;
 
@@ -1232,15 +1333,28 @@ function startApp() {
 
 async function ensureUsers() {
     const updates = {};
-    for (const m of MEMBERS) {
+    for (const m of ALL_USERS) {
         if (!appData.users[m]) {
-            updates['/users/' + m + '/name']      = m;
-            updates['/users/' + m + '/betBalance'] = INITIAL_BETS;
-            updates['/users/' + m + '/totalPnl']  = 0;
+            updates['/users/' + m + '/name']       = m;
+            updates['/users/' + m + '/betBalance'] = m === GROUP_MEMBER ? 99 : INITIAL_BETS;
+            updates['/users/' + m + '/totalPnl']   = m === GROUP_MEMBER ? GROUP_PNL_SEED : 0;
             updates['/users/' + m + '/betsPlaced'] = 0;
-            updates['/users/' + m + '/betsWon']   = 0;
+            updates['/users/' + m + '/betsWon']    = 0;
             updates['/users/' + m + '/lastBetWeek'] = 0;
         }
+    }
+    // Seed PP balance once if not yet set
+    if (appData.config.ppBalance == null) {
+        updates['/config/ppBalance'] = PP_BALANCE_SEED;
+    }
+    // Seed the initial England vs Ghana free bet if no list exists yet
+    if (!appData.config.freeBetList) {
+        const fbId = db.ref('/config/freeBetList').push().key;
+        updates[`/config/freeBetList/${fbId}`] = {
+            id: fbId, amount: PP_FREE_BET_SEED,
+            description: 'England vs Ghana only',
+            assignedTo: '', addedAt: Date.now()
+        };
     }
     if (Object.keys(updates).length) await db.ref('/').update(updates);
     if (!appData.currentWeek) await db.ref('/currentWeek').set(1);
@@ -1266,12 +1380,21 @@ function showPage(page) {
 }
 
 function renderPage(page) {
+    applyNavGates();
     if (page === 'dashboard')   renderDashboard();
     if (page === 'submit')      renderSubmit();
     if (page === 'feed')        renderFeed();
     if (page === 'leaderboard') renderLeaderboard();
     if (page === 'queue')       renderQueue();
     if (page === 'admin')       renderAdmin();
+}
+
+function applyNavGates() {
+    const feats = appData.config?.features || {};
+    const hide = (id) => document.getElementById(id)?.classList.add('hidden');
+    const show = (id) => document.getElementById(id)?.classList.remove('hidden');
+    feats.feed        === false ? hide('nav-feed')        : show('nav-feed');
+    feats.leaderboard === false ? hide('nav-leaderboard') : show('nav-leaderboard');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1375,6 +1498,17 @@ function needsActivityWarning(user) {
 // ══════════════════════════════════════════════════════════════
 //  DASHBOARD
 // ══════════════════════════════════════════════════════════════
+function buildAtRiskStat(atRisk, pending) {
+    const atRiskStr  = atRisk > 0 ? `€${atRisk.toFixed(2)}` : '—';
+    const pendingBit = pending > 0
+        ? ` <span style="color:var(--text-light);font-size:0.9em">(+€${pending.toFixed(2)} unplaced)</span>`
+        : '';
+    return `<div class="dash-stat">
+        <div class="dash-stat-val" style="font-size:1.2em;color:var(--amber)">${atRiskStr}</div>
+        <div class="dash-stat-label">Awaiting Result${pendingBit}</div>
+    </div>`;
+}
+
 function renderDashboard() {
     const balance = getUserBalance(currentUser);
     const weekPnl = getWeeklyPnl(currentUser, currentWeek);
@@ -1385,11 +1519,23 @@ function renderDashboard() {
     document.getElementById('dashWeekLabel').textContent = weekLabel(currentWeek);
     document.getElementById('dashWeekDates').textContent = getWeekDates(currentWeek);
 
-    // Free bet banner
-    const fbHolder = getCurrentFreeBetHolder();
-    if (fbHolder) {
-        document.getElementById('freeBetBanner').classList.remove('hidden');
-        document.getElementById('freeBetHolder').textContent = fbHolder;
+    // Free bet banners — one card per active free bet
+    const freeBets = getActiveFbList();
+    const fbBanner = document.getElementById('freeBetBanner');
+    const fbList   = document.getElementById('freeBetList');
+    const feats    = appData.config?.features || {};
+    if (freeBets.length && feats.freeBets !== false) {
+        fbBanner.classList.remove('hidden');
+        fbList.innerHTML = freeBets.map(fb => `
+            <div class="free-bet-banner" style="margin-bottom:8px">
+                <div class="free-bet-icon">🎁</div>
+                <div class="free-bet-text">
+                    <strong>€${Number.parseFloat(fb.amount).toFixed(2)} Free Bet${fb.assignedTo ? ` — ${esc(fb.assignedTo)}` : ''}</strong>
+                    <span>${fb.description ? esc(fb.description) : 'No restrictions'}</span>
+                </div>
+            </div>`).join('');
+    } else {
+        fbBanner.classList.add('hidden');
     }
 
     // Activity warning
@@ -1402,7 +1548,21 @@ function renderDashboard() {
     }
 
     // Stat cards
-    const betsUsed = myBets.filter(b => b.status !== 'void').length;
+    const betsUsed    = myBets.filter(b => b.status !== 'void').length;
+    const ppBalance   = appData.config?.ppBalance ?? PP_BALANCE_SEED;
+    const activeFbs   = getActiveFbList();
+    const fbTotal     = activeFbs.reduce((s, fb) => s + Number.parseFloat(fb.amount), 0);
+    const fbStr       = activeFbs.length
+        ? `<span style="color:var(--amber);font-size:0.85em">+€${fbTotal.toFixed(2)} free (${activeFbs.length})</span>`
+        : '';
+    // atRiskVal = placed on PP, awaiting result; pendingVal = submitted but not yet placed
+    const allActiveBets = Object.values(appData.bets);
+    const atRiskVal = allActiveBets
+        .filter(b => b.status === 'placed')
+        .reduce((s, b) => s + (Number.parseFloat(b.stake) || BET_VALUE) * (b.type === 'ew' ? 2 : 1), 0);
+    const pendingVal = allActiveBets
+        .filter(b => b.status === 'pending')
+        .reduce((s, b) => s + (Number.parseFloat(b.stake) || BET_VALUE), 0);
     document.getElementById('dashStats').innerHTML = `
         <div class="dash-stat">
             <div class="dash-stat-val">${balance}</div>
@@ -1421,9 +1581,15 @@ function renderDashboard() {
             <div class="dash-stat-label">All-Time P&L</div>
         </div>
         <div class="dash-stat">
-            <div class="dash-stat-val gold">€${balance * BET_VALUE}</div>
+            <div class="dash-stat-val gold">€${(balance * BET_VALUE).toFixed(2)}</div>
             <div class="dash-stat-label">Stake Value</div>
         </div>
+        ${feats.atRisk === false || (pendingVal === 0 && atRiskVal === 0) ? '' : buildAtRiskStat(atRiskVal, pendingVal)}
+        ${feats.ppBalance === false ? '' : `
+        <div class="dash-stat">
+            <div class="dash-stat-val" style="font-size:1.4em;color:#1a6b3a">€${ppBalance.toFixed(2)}</div>
+            <div class="dash-stat-label">PP Balance ${fbStr}</div>
+        </div>`}
     `;
 
     // My bets this week
@@ -1665,7 +1831,7 @@ function clearFeedBadge() {
 // ══════════════════════════════════════════════════════════════
 function setFeedFilter(f) {
     feedFilter = f;
-    ['week','all','mine','pending','won'].forEach(x => {
+    ['week','all','mine','pending','placed','won'].forEach(x => {
         document.getElementById('ff-' + x)?.classList.toggle('active', x === f);
     });
     renderFeed();
@@ -1694,6 +1860,7 @@ function renderFeed() {
     if (feedFilter === 'week')    bets = bets.filter(b => b.week === currentWeek);
     if (feedFilter === 'mine')    bets = bets.filter(b => b.user === currentUser);
     if (feedFilter === 'pending') bets = bets.filter(b => b.status === 'pending');
+    if (feedFilter === 'placed')  bets = bets.filter(b => b.status === 'placed');
     if (feedFilter === 'won')     bets = bets.filter(b => b.status === 'won');
 
     // Apply member filter
@@ -1750,11 +1917,63 @@ function setLbView(v) {
     renderLeaderboard();
 }
 
+function buildLbRow(r, i, isWeek, freeBetHolder) {
+    const pos = i + 1;
+    const badgeMap = { 1: 'pos-1', 2: 'pos-2', 3: 'pos-3' };
+    const badgeClass = badgeMap[pos] || 'pos-n';
+    const isMe  = r.m === currentUser;
+    const crown = r.m === freeBetHolder ? ' <span class="crown" title="Free bet holder">🎁</span>' : '';
+    const weekCols = isWeek ? `<td>${r.placed}</td><td>${r.won}</td><td>${r.sr}%</td>` : '';
+    return `<tr class="${isMe ? 'me' : ''} ${pos === 1 ? 'top' : ''}">
+        <td><span class="pos-badge ${badgeClass}">${pos}</span></td>
+        <td><strong>${esc(r.m)}</strong>${crown}</td>
+        <td class="${r.pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${fmtEuro(r.pnl)}</td>
+        ${weekCols}
+        <td>${r.balance}</td>
+    </tr>`;
+}
+
+function buildLbMemberRow(m, isWeek) {
+    const week  = isWeek ? currentWeek : null;
+    const pnl   = isWeek ? getWeeklyPnl(m, currentWeek) : getAllTimePnl(m);
+    const bets  = getUserBets(m, week);
+    const sett  = bets.filter(b => b.status === 'won' || b.status === 'lost');
+    const won   = bets.filter(b => b.status === 'won').length;
+    const sr    = sett.length ? Math.round((won / sett.length) * 100) : 0;
+    return { m, pnl, placed: sett.length, won, sr, balance: getUserBalance(m) };
+}
+
+function buildWeeklyWinnerRow(w) {
+    const winner = getWeekTopTipster(w);
+    const pnl      = winner ? getWeeklyPnl(winner, w) : 0;
+    const pnlClass = pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+    const pnlHtml  = winner
+        ? `<span class="${pnlClass}" style="font-size:0.9em">${fmtEuro(pnl)}</span>`
+        : '';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <span class="week-badge">${weekLabel(w)}</span>
+        <strong>${winner ? esc(winner) : '—'}</strong>
+        ${pnlHtml}
+        <span style="font-size:0.82em;color:var(--text-light);margin-left:auto">${getWeekDates(w)}</span>
+    </div>`;
+}
+
+function buildGroupMiniBet(b) {
+    const profitClass = b.profit >= 0 ? 'pnl-pos' : 'pnl-neg';
+    const profitBit   = b.profit == null
+        ? ''
+        : `<span class="${profitClass}" style="font-size:0.9em">${fmtEuro(b.profit)}</span>`;
+    return `<div style="background:var(--card-bg2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:0.78em">
+        <div style="font-weight:600;color:var(--navy-mid);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(b.selection)}</div>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:3px">${statusChip(b.status)}${profitBit}</div>
+    </div>`;
+}
+
 function renderLeaderboard() {
-    // Summary stats
-    const allBets = Object.values(appData.bets);
+    // Summary stats (exclude Group bets from totals)
+    const allBets = Object.values(appData.bets).filter(b => b.user !== GROUP_MEMBER);
     const settled = allBets.filter(b => b.status === 'won' || b.status === 'lost');
-    const totalStaked = settled.reduce((s,b) => s + (parseFloat(b.stake)||0), 0);
+    const totalStaked = settled.reduce((s,b) => s + (Number.parseFloat(b.stake)||0), 0);
     const totalWon = settled.filter(b => b.status === 'won').length;
     const bigWins  = settled.filter(b => b.status === 'won' && isBigOdds(b.odds)).length;
     document.getElementById('lbStats').innerHTML = `
@@ -1764,33 +1983,10 @@ function renderLeaderboard() {
         <div class="stat-card"><div class="stat-val">${bigWins}</div><div class="stat-label">Big Odds Wins (${BIG_ODDS_THRESHOLD}/1+)</div></div>
     `;
 
-    // Table
-    const rows = MEMBERS.map(m => {
-        const pnl     = lbView === 'week' ? getWeeklyPnl(m, currentWeek) : getAllTimePnl(m);
-        const bets    = getUserBets(m, lbView === 'week' ? currentWeek : null);
-        const settled = bets.filter(b => b.status === 'won' || b.status === 'lost');
-        const won     = bets.filter(b => b.status === 'won').length;
-        const sr      = settled.length ? Math.round((won / settled.length) * 100) : 0;
-        const balance = getUserBalance(m);
-        return { m, pnl, placed: settled.length, won, sr, balance };
-    }).sort((a,b) => b.pnl - a.pnl);
-
-    const freeBetHolder = getCurrentFreeBetHolder();
     const isWeek = lbView === 'week';
-
-    const tableRows = rows.map((r, i) => {
-        const pos = i + 1;
-        const badgeClass = pos === 1 ? 'pos-1' : pos === 2 ? 'pos-2' : pos === 3 ? 'pos-3' : 'pos-n';
-        const isMe = r.m === currentUser;
-        const crown = r.m === freeBetHolder ? ' <span class="crown" title="Free bet holder">🎁</span>' : '';
-        return `<tr class="${isMe ? 'me' : ''} ${pos === 1 ? 'top' : ''}">
-            <td><span class="pos-badge ${badgeClass}">${pos}</span></td>
-            <td><strong>${esc(r.m)}</strong>${crown}</td>
-            <td class="${r.pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${fmtEuro(r.pnl)}</td>
-            ${isWeek ? `<td>${r.placed}</td><td>${r.won}</td><td>${r.sr}%</td>` : ''}
-            <td>${r.balance}</td>
-        </tr>`;
-    }).join('');
+    const freeBetHolder = getCurrentFreeBetHolder();
+    const rows = MEMBERS.map(m => buildLbMemberRow(m, isWeek)).sort((a,b) => b.pnl - a.pnl);
+    const tableRows = rows.map((r, i) => buildLbRow(r, i, isWeek, freeBetHolder)).join('');
 
     document.getElementById('lbContainer').innerHTML = `
         ${isWeek ? '<p style="font-size:0.78em;color:var(--text-light);margin-bottom:8px">Placed / Won / SR% are for this week only</p>' : ''}
@@ -1803,6 +1999,54 @@ function renderLeaderboard() {
             <tbody>${tableRows}</tbody>
         </table>`;
 
+    // Group account card
+    const groupCardEl = document.getElementById('groupCard').parentElement;
+    if ((appData.config?.features?.groupCard) === false) {
+        groupCardEl.classList.add('hidden');
+    } else {
+        groupCardEl.classList.remove('hidden');
+    }
+    const gBets    = getUserBets(GROUP_MEMBER, lbView === 'week' ? currentWeek : null);
+    const gSettled = gBets.filter(b => b.status === 'won' || b.status === 'lost');
+    const gWon     = gBets.filter(b => b.status === 'won').length;
+    const gActive  = gBets.filter(b => b.status === 'placed' || b.status === 'pending').length;
+    const gPnl     = lbView === 'week' ? getWeeklyPnl(GROUP_MEMBER, currentWeek) : getAllTimePnl(GROUP_MEMBER);
+    const gSr      = gSettled.length ? Math.round((gWon / gSettled.length) * 100) : 0;
+    const activeFbs  = getActiveFbList();
+    const fbTotal    = activeFbs.reduce((s, fb) => s + Number.parseFloat(fb.amount), 0);
+    const ppBalance  = appData.config?.ppBalance ?? PP_BALANCE_SEED;
+    const fbBadge    = activeFbs.length
+        ? `<span style="color:var(--amber);font-weight:600">+€${fbTotal.toFixed(2)} free (${activeFbs.length})</span>`
+        : '';
+    document.getElementById('groupCard').innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+            <div>
+                <div style="font-size:0.78em;color:var(--text-light);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">${isWeek ? weekLabel(currentWeek) : 'All Time'}</div>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <span class="dash-stat-val ${gPnl >= 0 ? 'green' : 'red'}" style="font-size:1.6em">${fmtEuro(gPnl)}</span>
+                    <span style="font-size:0.82em;color:var(--text-light)">${gSettled.length} settled · ${gWon} won · ${gSr}% SR</span>
+                    ${gActive > 0 ? `<span style="font-size:0.82em;color:#1d4ed8">${gActive} active</span>` : ''}
+                </div>
+            </div>
+            <div style="text-align:right">
+                <div style="font-size:0.75em;color:var(--text-light);text-transform:uppercase;letter-spacing:0.5px">PP Balance</div>
+                <div style="font-size:1.5em;font-weight:900;color:#1a6b3a">€${ppBalance.toFixed(2)} ${fbBadge}</div>
+            </div>
+        </div>
+        ${activeFbs.length ? `
+        <div style="margin-bottom:12px">
+            <div style="font-size:0.78em;font-weight:700;color:var(--navy-mid);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">🎁 Active Free Bets</div>
+            ${activeFbs.map(fb => `
+                <div class="free-bet-item">
+                    <span class="fbi-amount">€${Number.parseFloat(fb.amount).toFixed(2)}</span>
+                    <span class="fbi-desc">${esc(fb.description || 'No restrictions')}</span>
+                    ${fb.assignedTo ? `<span class="fbi-who">→ ${esc(fb.assignedTo)}</span>` : ''}
+                </div>`).join('')}
+        </div>` : ''}
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">
+            ${gBets.slice(-6).reverse().map(buildGroupMiniBet).join('')}
+        </div>`;
+
     // Weekly winners
     const prevWeeks = [];
     for (let w = Math.max(1, currentWeek - 1); w >= 1; w--) {
@@ -1812,16 +2056,7 @@ function renderLeaderboard() {
     if (!prevWeeks.length) {
         document.getElementById('weeklyWinners').innerHTML = '<p style="color:var(--text-light)">No completed weeks yet.</p>';
     } else {
-        document.getElementById('weeklyWinners').innerHTML = prevWeeks.map(w => {
-            const winner = getWeekTopTipster(w);
-            const pnl = winner ? getWeeklyPnl(winner, w) : 0;
-            return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
-                <span class="week-badge">${weekLabel(w)}</span>
-                <strong>${winner ? esc(winner) : '—'}</strong>
-                ${winner ? `<span class="${pnl >= 0 ? 'pnl-pos':'pnl-neg'}" style="font-size:0.9em">${fmtEuro(pnl)}</span>` : ''}
-                <span style="font-size:0.82em;color:var(--text-light);margin-left:auto">${getWeekDates(w)}</span>
-            </div>`;
-        }).join('');
+        document.getElementById('weeklyWinners').innerHTML = prevWeeks.map(buildWeeklyWinnerRow).join('');
     }
 }
 
@@ -1907,6 +2142,7 @@ function betCardHtml(b, showUser, showActions) {
         ? (Number.parseFloat(b.stake) * 2).toFixed(2)
         : Number.parseFloat(b.stake).toFixed(2);
     const oddsDisplay = betOddsDisplay(b);
+    const feats = appData.config?.features || {};
 
     return `<div class="bet-card ${isMine ? 'mine' : ''} ${b.status === 'won' ? 'won' : ''}">
         <div class="bet-card-header">
@@ -1918,7 +2154,7 @@ function betCardHtml(b, showUser, showActions) {
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
                 ${statusChip(b.status)}
                 ${betProfitHtml(b)}
-                <button class="btn btn-sm btn-ghost" style="font-size:0.72em;padding:3px 8px" onclick="openShareModal('${b.id}')">🔗 Share</button>
+                ${feats.shareButton === false ? '' : `<button class="btn btn-sm btn-ghost" style="font-size:0.72em;padding:3px 8px" onclick="openShareModal('${b.id}')">🔗 Share</button>`}
             </div>
         </div>
         ${betScreenshotHtml(b)}
@@ -1934,9 +2170,7 @@ function betCardHtml(b, showUser, showActions) {
             </span>
         </div>
         ${betActionsHtml(b, showActions)}
-        <div class="comments-section" id="comments-section-${b.id}">
-            ${commentsHtml(b.id)}
-        </div>
+        ${feats.comments === false ? '' : `<div class="comments-section" id="comments-section-${b.id}">${commentsHtml(b.id)}</div>`}
     </div>`;
 }
 
@@ -1962,11 +2196,21 @@ async function markPlaced(betId) {
         ${screenshotHtml}
         <div class="form-group">
             <label>Bet type</label>
-            <select id="placedType" onchange="updatePlacedStakeHint()">
+            <select id="placedType" onchange="updatePlacedStakeHint();updateFreeBetPicker()">
                 <option value="single">Single</option>
                 <option value="ew">Each Way</option>
-                <option value="freeBet">Free Bet</option>
+                <option value="freeBet">Free Bet 🎁</option>
             </select>
+        </div>
+        <div class="form-group hidden" id="freeBetPickerGroup">
+            <label>Which free bet?</label>
+            <select id="freeBetPicker">
+                <option value="">— select one —</option>
+                ${getActiveFbList().map(fb =>
+                    `<option value="${fb.id}">€${Number.parseFloat(fb.amount).toFixed(2)}${fb.description ? ' — ' + fb.description : ''}${fb.assignedTo ? ' (→ ' + fb.assignedTo + ')' : ''}</option>`
+                ).join('')}
+            </select>
+            <p style="font-size:0.78em;color:var(--text-light);margin-top:3px">This free bet will be marked as used when you confirm.</p>
         </div>
         <div class="form-group">
             <label>Stake per line (€)</label>
@@ -1997,6 +2241,11 @@ function closePlacedModal() {
     placingBetId = null;
 }
 
+function updateFreeBetPicker() {
+    const isFb = document.getElementById('placedType')?.value === 'freeBet';
+    document.getElementById('freeBetPickerGroup')?.classList.toggle('hidden', !isFb);
+}
+
 function updatePlacedStakeHint() {
     const stake = parseFloat(document.getElementById('placedStake')?.value);
     const type  = document.getElementById('placedType')?.value;
@@ -2022,6 +2271,10 @@ async function confirmPlaced() {
     const actualStake = parseFloat(document.getElementById('placedStake').value) || b.stake;
     const placedType  = document.getElementById('placedType').value;
     const description = document.getElementById('placedDescription').value.trim();
+    const isEw = placedType === 'ew';
+    const isFb = placedType === 'freeBet';
+    const totalStake = isEw ? actualStake * 2 : actualStake;
+
     const updates = {
         [`/bets/${b.id}/status`]:      'placed',
         [`/bets/${b.id}/oddsPlaced`]:  actualOdds,
@@ -2031,6 +2284,16 @@ async function confirmPlaced() {
         [`/bets/${b.id}/placedAt`]:    Date.now()
     };
     if (description) updates[`/bets/${b.id}/description`] = description;
+
+    // Deduct stake from PP cash balance, or consume a named free bet
+    const ppBalance = appData.config.ppBalance ?? PP_BALANCE_SEED;
+    if (isFb) {
+        const fbId = document.getElementById('freeBetPicker')?.value;
+        if (fbId) updates[`/config/freeBetList/${fbId}`] = null;  // remove it
+    } else {
+        updates['/config/ppBalance'] = Math.max(0, ppBalance - totalStake);
+    }
+
     await db.ref('/').update(updates);
     closePlacedModal();
 }
@@ -2104,66 +2367,71 @@ function updateSettleReturnsHint() {
     hint.style.color = profit >= 0 ? 'var(--green-dark)' : 'var(--red-dark)';
 }
 
-async function settleBet() {
-    const b = appData.bets[settlingBetId];
-    if (!b) return;
-    const result  = document.getElementById('settleResult').value;
-    const returns = parseFloat(document.getElementById('settleReturns').value) || 0;
-
-    // EW bets cost stake × 2 total; profit/loss must account for this
+function calcSettleOutcome(b, result, returns) {
     const isEw = b.type === 'ew';
+    const isFb = b.type === 'freeBet';
     const totalStake = isEw ? b.stake * 2 : b.stake;
-
-    let profit;
-    let settleStatus;
-    if (result === 'won') {
-        // Free bets: returns are pure profit (no stake of your own was risked)
-        profit = b.type === 'freeBet' ? returns : returns - totalStake;
-        settleStatus = 'won';
-    } else if (result === 'ew-place') {
-        profit = b.type === 'freeBet' ? returns : returns - totalStake;
-        settleStatus = profit >= 0 ? 'won' : 'lost';
+    let profit, settleStatus;
+    if (result === 'won' || result === 'ew-place') {
+        profit = isFb ? returns : returns - totalStake;
+        settleStatus = (result === 'ew-place' && profit < 0) ? 'lost' : 'won';
     } else if (result === 'lost') {
-        profit = b.type === 'freeBet' ? 0 : -totalStake;
+        profit = isFb ? 0 : -totalStake;
         settleStatus = 'lost';
     } else {
         profit = 0;
         settleStatus = 'void';
     }
+    return { profit, settleStatus, totalStake };
+}
 
-    const user    = appData.users[b.user] || {};
-    const balance = getUserBalance(b.user);
+function calcSettleBalance(b, settleStatus, balance) {
     const betsNeeded = Math.ceil(b.stake / BET_VALUE);
-
-    let newBalance = balance;
-    let pnlDelta   = 0;
-
     if (settleStatus === 'won') {
-        newBalance = Math.min(MAX_CARRY, balance + betsNeeded);
-        if (isBigOdds(b.oddsPlaced || b.odds)) newBalance = Math.min(MAX_CARRY, newBalance + 1);
-        pnlDelta = profit;
-    } else if (settleStatus === 'lost') {
-        pnlDelta = profit; // already negative
-    } else if (settleStatus === 'void') {
-        newBalance = Math.min(MAX_CARRY, balance + betsNeeded);
-        pnlDelta   = 0;
+        const bonus = isBigOdds(b.oddsPlaced || b.odds) ? 1 : 0;
+        return Math.min(MAX_CARRY, balance + betsNeeded + bonus);
     }
+    if (settleStatus === 'void') return Math.min(MAX_CARRY, balance + betsNeeded);
+    return balance;
+}
 
+function calcSettlePpUpdates(b, settleStatus, returns, totalStake) {
+    const ppBalance = appData.config.ppBalance ?? PP_BALANCE_SEED;
+    const isFb = b.type === 'freeBet';
+    if (settleStatus === 'void') {
+        // Free bet voids: the named free bet was already consumed at placement — no cash refund
+        if (isFb) return {};
+        return { '/config/ppBalance': Math.round((ppBalance + totalStake) * 100) / 100 };
+    }
+    if (returns > 0) return { '/config/ppBalance': Math.round((ppBalance + returns) * 100) / 100 };
+    return {};
+}
+
+async function settleBet() {
+    const b = appData.bets[settlingBetId];
+    if (!b) return;
+    const result  = document.getElementById('settleResult').value;
+    const returns = Number.parseFloat(document.getElementById('settleReturns').value) || 0;
+
+    const { profit, settleStatus, totalStake } = calcSettleOutcome(b, result, returns);
+    const user       = appData.users[b.user] || {};
+    const balance    = getUserBalance(b.user);
+    const newBalance = calcSettleBalance(b, settleStatus, balance);
+    const pnlDelta   = settleStatus === 'void' ? 0 : profit;
     const newTotalPnl = getAllTimePnl(b.user) + pnlDelta;
 
     const updates = {
-        [`/bets/${b.id}/status`]:  settleStatus,
-        [`/bets/${b.id}/profit`]:  profit,
-        [`/bets/${b.id}/returns`]: returns,
-        [`/bets/${b.id}/settledAt`]: Date.now(),
+        [`/bets/${b.id}/status`]:        settleStatus,
+        [`/bets/${b.id}/profit`]:        profit,
+        [`/bets/${b.id}/returns`]:       returns,
+        [`/bets/${b.id}/settledAt`]:     Date.now(),
         [`/users/${b.user}/betBalance`]: newBalance,
         [`/users/${b.user}/totalPnl`]:   newTotalPnl,
+        ...calcSettlePpUpdates(b, settleStatus, returns, totalStake),
     };
-    if (settleStatus === 'won') {
-        updates[`/users/${b.user}/betsWon`] = (user.betsWon || 0) + 1;
-    }
-    await db.ref('/').update(updates);
+    if (settleStatus === 'won') updates[`/users/${b.user}/betsWon`] = (user.betsWon || 0) + 1;
 
+    await db.ref('/').update(updates);
     deleteScreenshot(b);
     closeSettleModal();
 }
@@ -2241,12 +2509,14 @@ async function voidBet(betId) {
     const balance    = getUserBalance(b.user);
     const betsNeeded = Math.ceil(b.stake / BET_VALUE);
     const newBalance = Math.min(MAX_CARRY, balance + (b.type === 'freeBet' ? 0 : betsNeeded));
-    await db.ref('/').update({
+    const isEw = b.type === 'ew';
+    const totalStake = isEw ? b.stake * 2 : b.stake;
+    const updates = {
         [`/bets/${betId}/status`]: 'void',
-        [`/users/${b.user}/betBalance`]: newBalance
-    });
-
-    // Delete screenshot on void too
+        [`/users/${b.user}/betBalance`]: newBalance,
+        ...calcSettlePpUpdates(b, 'void', 0, totalStake),
+    };
+    await db.ref('/').update(updates);
     deleteScreenshot(b);
 }
 
@@ -2273,7 +2543,7 @@ function showAdminTab(t) {
         document.getElementById('adminTab-' + x)?.classList.toggle('hidden', x !== t);
     });
     if (t === 'users')  renderAdminUsers();
-    if (t === 'config') renderAdminConfig();
+    if (t === 'config') { renderAdminConfig(); renderAdminFreeBets(); renderFeatureToggles(); }
 }
 
 function renderAdmin() {
@@ -2294,25 +2564,25 @@ function renderAdmin() {
     }
     if (fbSel) fbSel.value = appData.config?.freeBetOverride || '';
 
-    // Populate retro member select
+    // Populate retro member select (includes Group)
     const retroSel = document.getElementById('retroMember');
     if (retroSel && !retroSel.options.length) {
-        MEMBERS.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; retroSel.appendChild(o); });
+        ALL_USERS.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; retroSel.appendChild(o); });
     }
     document.getElementById('retroWeek').value = currentWeek;
 
-    // Populate editPnl member select
+    // Populate editPnl member select (includes Group)
     const pnlSel = document.getElementById('editPnlMember');
     if (pnlSel && !pnlSel.options.length) {
-        MEMBERS.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; pnlSel.appendChild(o); });
+        ALL_USERS.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; pnlSel.appendChild(o); });
     }
 
     if (adminTab === 'users')  renderAdminUsers();
-    if (adminTab === 'config') renderAdminConfig();
+    if (adminTab === 'config') { renderAdminConfig(); renderAdminFreeBets(); renderFeatureToggles(); }
 }
 
 function renderAdminUsers() {
-    const rows = MEMBERS.map(m => {
+    const rows = MEMBERS.map(m => {   // Group managed separately via PP balance, not here
         const balance = getUserBalance(m);
         return `<tr>
             <td><strong>${esc(m)}</strong></td>
@@ -2374,11 +2644,63 @@ function renderAdminConfig() {
     const c = appData.config || {};
     document.getElementById('cfgStartDate').value      = c.startDate || '2026-06-20';
     document.getElementById('cfgBetsPerWeek').value    = c.betsPerWeek || BETS_PER_WEEK;
+    document.getElementById('cfgPpBalance').value      = (c.ppBalance  ?? PP_BALANCE_SEED).toFixed(2);
     document.getElementById('cfgDiscord').value        = c.discordWebhook || '';
     document.getElementById('cfgEmailService').value   = c.emailService || '';
     document.getElementById('cfgEmailTemplate').value  = c.emailTemplate || '';
     document.getElementById('cfgEmailKey').value       = c.emailKey || '';
     document.getElementById('cfgPlacerEmails').value   = c.placerEmails || '';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FEATURE TOGGLES
+// ══════════════════════════════════════════════════════════════
+const FEATURE_DEFS = [
+    { key: 'ppBalance',    label: 'PP Balance stat',         desc: 'Cash balance card on the dashboard' },
+    { key: 'freeBets',     label: 'Free bets banners',       desc: 'Amber free-bet cards shown on the dashboard' },
+    { key: 'groupCard',    label: 'Group account card',      desc: 'Group P&L + active bets on the leaderboard' },
+    { key: 'comments',     label: 'Comments on bets',        desc: 'Comment thread under each bet card' },
+    { key: 'shareButton',  label: 'Share button',            desc: 'Share button on each bet card' },
+    { key: 'atRisk',       label: 'At Risk stat',            desc: 'Pending / placed stake value on the dashboard' },
+    { key: 'leaderboard',  label: 'Leaderboard page',        desc: 'Full leaderboard tab' },
+    { key: 'feed',         label: 'Feed page',               desc: 'Bet feed tab (everyone can see all bets)' },
+];
+
+function renderFeatureToggles() {
+    const el = document.getElementById('featureToggles');
+    if (!el) return;
+    const feats = appData.config?.features || {};
+    el.innerHTML = FEATURE_DEFS.map(f => `
+        <div class="feature-toggle-row">
+            <div class="feature-toggle-label">
+                ${esc(f.label)}
+                <small>${esc(f.desc)}</small>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="feat-${f.key}" ${feats[f.key] === false ? '' : 'checked'}>
+                <span class="toggle-slider"></span>
+            </label>
+        </div>`).join('');
+}
+
+async function saveFeatureToggles() {
+    const updates = {};
+    FEATURE_DEFS.forEach(f => {
+        const el = document.getElementById('feat-' + f.key);
+        updates[`/config/features/${f.key}`] = el ? el.checked : true;
+    });
+    await db.ref('/').update(updates);
+    document.getElementById('featureToggleMsg').innerHTML = '<div class="alert alert-success">Feature visibility saved.</div>';
+    setTimeout(() => document.getElementById('featureToggleMsg').innerHTML = '', 2500);
+}
+
+async function savePpBalance() {
+    const bal = Number.parseFloat(document.getElementById('cfgPpBalance').value);
+    const msg = document.getElementById('cfgPpMsg');
+    if (Number.isNaN(bal)) { msg.innerHTML = '<div class="alert alert-error">Enter a valid number.</div>'; return; }
+    await db.ref('/config/ppBalance').set(Math.round(bal * 100) / 100);
+    msg.innerHTML = '<div class="alert alert-success">PP balance updated.</div>';
+    setTimeout(() => msg.innerHTML = '', 3000);
 }
 
 async function saveSyndicateSettings() {
@@ -2428,7 +2750,7 @@ async function advanceWeek() {
 
     const updates = { '/currentWeek': currentWeek + 1 };
 
-    for (const m of MEMBERS) {
+    for (const m of MEMBERS) {   // Group doesn't receive weekly bet allocations
         const balance = getUserBalance(m);
         let newBalance = Math.min(MAX_CARRY, balance + bpw);
 
@@ -2813,6 +3135,53 @@ function patchCommentSection(betId) {
         if (list)  list.classList.remove('hidden');
         if (arrow) arrow.style.transform = 'rotate(180deg)';
     }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FREE BETS
+// ══════════════════════════════════════════════════════════════
+function getActiveFbList() {
+    return Object.values(appData.config.freeBetList || {})
+        .sort((a, b) => a.addedAt - b.addedAt);
+}
+
+async function addFreeBet() {
+    const amount      = Number.parseFloat(document.getElementById('fbAmount').value);
+    const description = document.getElementById('fbDescription').value.trim();
+    const assignedTo  = document.getElementById('fbAssignedTo').value;
+    const msg         = document.getElementById('fbMsg');
+    if (!amount || amount <= 0) { msg.innerHTML = '<div class="alert alert-error">Enter a valid amount.</div>'; return; }
+    const id = db.ref('/config/freeBetList').push().key;
+    await db.ref(`/config/freeBetList/${id}`).set({ id, amount, description, assignedTo, addedAt: Date.now() });
+    document.getElementById('fbAmount').value      = '';
+    document.getElementById('fbDescription').value = '';
+    document.getElementById('fbAssignedTo').value  = '';
+    msg.innerHTML = '<div class="alert alert-success">Free bet added.</div>';
+    setTimeout(() => msg.innerHTML = '', 2500);
+    renderAdminFreeBets();
+}
+
+async function removeFreeBet(id) {
+    await db.ref(`/config/freeBetList/${id}`).remove();
+    renderAdminFreeBets();
+    showToast('Free bet removed');
+}
+
+function renderAdminFreeBets() {
+    const list = getActiveFbList();
+    const el   = document.getElementById('adminFreeBetList');
+    if (!el) return;
+    if (!list.length) {
+        el.innerHTML = '<p style="font-size:0.85em;color:var(--text-light)">No active free bets.</p>';
+        return;
+    }
+    el.innerHTML = list.map(fb => `
+        <div class="free-bet-item">
+            <span class="fbi-amount">€${Number.parseFloat(fb.amount).toFixed(2)}</span>
+            <span class="fbi-desc">${esc(fb.description || 'No restrictions')}</span>
+            ${fb.assignedTo ? `<span class="fbi-who">→ ${esc(fb.assignedTo)}</span>` : ''}
+            <button class="fbi-del" title="Remove" onclick="removeFreeBet('${fb.id}')">✕</button>
+        </div>`).join('');
 }
 
 // ══════════════════════════════════════════════════════════════
