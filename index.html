@@ -1325,6 +1325,7 @@ function startApp() {
         // Seed users if needed
         ensureUsers();
         updateFeedBadge();
+        updateQueueBadge();
         renderPage(currentPage);
     };
     db.ref('/').on('value', rootListener);
@@ -1802,6 +1803,19 @@ function loadSeenStatuses() {
 
 function saveSeenStatuses() {
     try { localStorage.setItem('synSeen_' + currentUser, JSON.stringify(seenBetStatuses)); } catch (e) { console.warn('Could not save seen statuses', e); }
+}
+
+function updateQueueBadge() {
+    const count = Object.values(appData.bets).filter(b => b.status === 'pending').length;
+    const nav = document.getElementById('nav-queue');
+    if (!nav) return;
+    let badge = nav.querySelector('.nav-badge');
+    if (count > 0) {
+        if (!badge) { badge = document.createElement('span'); badge.className = 'nav-badge'; nav.appendChild(badge); }
+        badge.textContent = count;
+    } else {
+        if (badge) badge.remove();
+    }
 }
 
 function updateFeedBadge() {
