@@ -2645,7 +2645,7 @@ async function resetPin(user) {
 
 function renderAdminConfig() {
     const c = appData.config || {};
-    document.getElementById('cfgStartDate').value      = c.startDate || '2026-06-20';
+    document.getElementById('cfgStartDate').value      = c.startDate || '2026-06-19';
     document.getElementById('cfgBetsPerWeek').value    = c.betsPerWeek || BETS_PER_WEEK;
     document.getElementById('cfgPpBalance').value      = (c.ppBalance  ?? PP_BALANCE_SEED).toFixed(2);
     document.getElementById('cfgDiscord').value        = c.discordWebhook || '';
@@ -2720,11 +2720,11 @@ async function saveSyndicateSettings() {
 
 async function saveConfig() {
     const updates = {
-        '/config/discordWebhook': document.getElementById('cfgDiscord').value.trim(),
-        '/config/emailService':   document.getElementById('cfgEmailService').value.trim(),
-        '/config/emailTemplate':  document.getElementById('cfgEmailTemplate').value.trim(),
-        '/config/emailKey':       document.getElementById('cfgEmailKey').value.trim(),
-        '/config/placerEmails':   document.getElementById('cfgPlacerEmails').value.trim(),
+        'config/discordWebhook': document.getElementById('cfgDiscord').value.trim(),
+        'config/emailService':   document.getElementById('cfgEmailService').value.trim(),
+        'config/emailTemplate':  document.getElementById('cfgEmailTemplate').value.trim(),
+        'config/emailKey':       document.getElementById('cfgEmailKey').value.trim(),
+        'config/placerEmails':   document.getElementById('cfgPlacerEmails').value.trim(),
     };
     await db.ref('/').update(updates);
     document.getElementById('cfgMsg').innerHTML = '<div class="alert alert-success">Config saved.</div>';
@@ -2994,7 +2994,7 @@ async function sendDiscordNotification(bet) {
 function exportData() {
     const msg = document.getElementById('exportMsg');
     try {
-        const snapshot = JSON.stringify(appData, null, 2);
+        const snapshot = JSON.stringify({ ...appData, currentWeek }, null, 2);
         const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const filename = `brady-syndicate-backup-${ts}.json`;
         const blob = new Blob([snapshot], { type: 'application/json' });
@@ -3118,9 +3118,9 @@ function toggleComments(betId) {
     const list  = document.getElementById('clist-' + betId);
     const arrow = document.getElementById('ctoggle-arrow-' + betId);
     if (!list) return;
-    const open = list.classList.toggle('hidden');
-    if (arrow) arrow.style.transform = open ? '' : 'rotate(180deg)';
-    if (!open) {
+    const nowHidden = list.classList.toggle('hidden');
+    if (arrow) arrow.style.transform = nowHidden ? '' : 'rotate(180deg)';
+    if (!nowHidden) {
         // Focus the input when opening
         setTimeout(() => document.getElementById('cinput-' + betId)?.focus(), 50);
     }
