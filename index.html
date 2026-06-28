@@ -1414,6 +1414,14 @@ function getWeekDates(weekNum) {
     return `${fmt(start)} – ${fmt(end)}`;
 }
 
+// Map a timestamp to its week number based on the configured start date.
+// Used to assign settled bets to the week they resolved in (not the week they were submitted).
+function tsToWeek(ts) {
+    const base = appData.config?.startDate ? new Date(appData.config.startDate) : new Date('2026-06-20');
+    const diff = ts - base.getTime();
+    return Math.max(1, Math.floor(diff / (7 * 24 * 60 * 60 * 1000)) + 1);
+}
+
 function parseOddsToDecimal(oddsStr) {
     if (!oddsStr) return null;
     const s = String(oddsStr).trim();
@@ -1444,8 +1452,15 @@ function getUserBalance(user) {
 }
 
 function getWeeklyPnl(user, week) {
-    return getUserBets(user, week)
+    // For the weekly view, count bets that *settled* in the given week (not submission week).
+    // This means a bet submitted Week 1 but settled Week 2 appears in Week 2's P&L.
+    return Object.values(appData.bets)
+        .filter(b => b.user === user)
         .filter(b => b.status === 'won' || b.status === 'lost')
+        .filter(b => {
+            if (week == null) return true;
+            return b.settledAt ? tsToWeek(b.settledAt) === week : b.week === week;
+        })
         .reduce((sum, b) => {
             if (b.profit != null) return sum + parseFloat(b.profit);
             // Fallback: free bets have no cost on loss; EW costs stake×2
@@ -1487,8 +1502,7 @@ function statusChip(status) {
 function needsActivityWarning(user) {
     if (currentWeek < ACTIVITY_WEEKS) return false;
     for (let w = currentWeek - ACTIVITY_WEEKS + 1; w <= currentWeek; w++) {
-        const bets = getUserBets(user, w);
-        if (bets.length) return false;
+        if (getUserBets(user, w).some(b => b.status !== 'void')) return false;
     }
     return true;
 }
@@ -1706,15 +1720,18 @@ async function submitBet() {
         }
     }
 
-    // Deduct 1 bet token — admins will confirm exact stake/type when placing
-    const newBalance = Math.max(0, balance - 1);
+    // Deduct 1 bet token — placer will confirm exact stake/type when placing.
+    // We store how many tokens were actually deducted so refunds are always exact.
+    const tokensDeducted = 1;
+    const newBalance = Math.max(0, balance - tokensDeducted);
 
     const bet = {
         id: betId,
         user: currentUser,
         selection,
-        stake: BET_VALUE,       // default; placer will confirm actual stake
-        type: 'single',         // default; placer will confirm type
+        stake: BET_VALUE,           // default; placer will confirm actual stake
+        type: 'single',             // default; placer will confirm type
+        tokensDeducted,             // exact tokens taken at submit — used for all refunds
         event: '',
         notes: '',
         status: 'pending',
@@ -1961,13 +1978,17 @@ function buildLbRow(r, i, isWeek, freeBetHolder) {
 }
 
 function buildLbMemberRow(m, isWeek) {
-    const week  = isWeek ? currentWeek : null;
     const pnl   = isWeek ? getWeeklyPnl(m, currentWeek) : getAllTimePnl(m);
-    const bets  = getUserBets(m, week);
-    const sett  = bets.filter(b => b.status === 'won' || b.status === 'lost');
+    // For the weekly columns, count bets that settled this week (not submission week)
+    const bets  = isWeek
+        ? Object.values(appData.bets).filter(b =>
+            b.user === m &&
+            (b.status === 'won' || b.status === 'lost') &&
+            (b.settledAt ? tsToWeek(b.settledAt) === currentWeek : b.week === currentWeek))
+        : getUserBets(m, null).filter(b => b.status === 'won' || b.status === 'lost');
     const won   = bets.filter(b => b.status === 'won').length;
-    const sr    = sett.length ? Math.round((won / sett.length) * 100) : 0;
-    return { m, pnl, placed: sett.length, won, sr, balance: getUserBalance(m) };
+    const sr    = bets.length ? Math.round((won / bets.length) * 100) : 0;
+    return { m, pnl, placed: bets.length, won, sr, balance: getUserBalance(m) };
 }
 
 function buildWeeklyWinnerRow(w) {
@@ -2323,6 +2344,18 @@ async function confirmPlaced() {
     };
     if (description) updates[`/bets/${b.id}/description`] = description;
 
+    // Reconcile tokens if the placer changed the stake from the submitted default.
+    // The correct token cost is ceil(totalStake / BET_VALUE); the member already paid
+    // b.tokensDeducted (default 1) at submit time.
+    const alreadyDeducted = b.tokensDeducted || 1;
+    const correctTokens   = isFb ? 0 : Math.ceil(totalStake / BET_VALUE);
+    const tokenDiff       = correctTokens - alreadyDeducted;  // positive = owe more; negative = overpaid
+    if (tokenDiff !== 0) {
+        const currentBal = getUserBalance(b.user);
+        updates[`/users/${b.user}/betBalance`] = Math.max(0, currentBal - tokenDiff);
+        updates[`/bets/${b.id}/tokensDeducted`] = correctTokens;
+    }
+
     // Deduct stake from PP cash balance, or consume a named free bet
     const ppBalance = appData.config.ppBalance ?? PP_BALANCE_SEED;
     if (isFb) {
@@ -2426,13 +2459,17 @@ function calcSettleOutcome(b, result, returns) {
 
 function calcSettleBalance(b, settleStatus, balance) {
     const isFb = b.type === 'freeBet';
-    const betsNeeded = Math.ceil(b.stake / BET_VALUE);
+    // Use the stored token count so refunds always mirror what was actually deducted.
+    // Fall back to ceil(totalStake / BET_VALUE) for bets created before this field existed.
+    const isEw = b.type === 'ew';
+    const totalStake = isEw ? b.stake * 2 : b.stake;
+    const tokensDeducted = b.tokensDeducted || Math.ceil(totalStake / BET_VALUE) || 1;
     if (settleStatus === 'won') {
         const bonus = isBigOdds(b.oddsPlaced || b.odds) ? 1 : 0;
-        return Math.min(MAX_CARRY, balance + betsNeeded + bonus);
+        return Math.min(MAX_CARRY, balance + tokensDeducted + bonus);
     }
-    // Free bets: the named free bet was already consumed — no token refund on void
-    if (settleStatus === 'void') return isFb ? balance : Math.min(MAX_CARRY, balance + betsNeeded);
+    // Free bets: named free bet was consumed at placement — no token refund on void
+    if (settleStatus === 'void') return isFb ? balance : Math.min(MAX_CARRY, balance + tokensDeducted);
     return balance;
 }
 
@@ -2548,10 +2585,10 @@ async function voidBet(betId) {
     const b = appData.bets[betId];
     if (!b) return;
     const balance    = getUserBalance(b.user);
-    const betsNeeded = Math.ceil(b.stake / BET_VALUE);
-    const newBalance = Math.min(MAX_CARRY, balance + (b.type === 'freeBet' ? 0 : betsNeeded));
     const isEw = b.type === 'ew';
     const totalStake = isEw ? b.stake * 2 : b.stake;
+    const tokensDeducted = b.tokensDeducted || Math.ceil(totalStake / BET_VALUE) || 1;
+    const newBalance = Math.min(MAX_CARRY, balance + (b.type === 'freeBet' ? 0 : tokensDeducted));
     const updates = {
         [`/bets/${betId}/status`]: 'void',
         [`/users/${b.user}/betBalance`]: newBalance,
@@ -2568,9 +2605,11 @@ async function deleteBet(betId) {
 
     // Refund balance if the bet was still active (pending/placed)
     if (['pending', 'placed'].includes(b.status) && b.type !== 'freeBet') {
-        const balance    = getUserBalance(b.user);
-        const betsNeeded = Math.ceil(b.stake / BET_VALUE);
-        const newBalance = Math.min(MAX_CARRY, balance + betsNeeded);
+        const balance        = getUserBalance(b.user);
+        const isEwD          = b.type === 'ew';
+        const totalStakeD    = isEwD ? b.stake * 2 : b.stake;
+        const tokensDeducted = b.tokensDeducted || Math.ceil(totalStakeD / BET_VALUE) || 1;
+        const newBalance     = Math.min(MAX_CARRY, balance + tokensDeducted);
         await db.ref('/users/' + b.user + '/betBalance').set(newBalance);
     }
 
@@ -2799,10 +2838,10 @@ async function advanceWeek() {
         const balance = getUserBalance(m);
         let newBalance = Math.min(MAX_CARRY, balance + bpw);
 
-        // Activity rule: if no bets in last ACTIVITY_WEEKS, forfeit 1 bet
+        // Activity rule: if no non-void bets in last ACTIVITY_WEEKS, forfeit 1 bet
         let hasBet = false;
         for (let w = currentWeek - ACTIVITY_WEEKS + 1; w <= currentWeek; w++) {
-            if (getUserBets(m, w).length) { hasBet = true; break; }
+            if (getUserBets(m, w).some(b => b.status !== 'void')) { hasBet = true; break; }
         }
         if (!hasBet && newBalance > 0) newBalance -= 1;
 
@@ -2869,23 +2908,14 @@ async function addRetroBet() {
 
     const updates = { [`/bets/${betId}`]: bet };
 
-    // Update P&L if settled
+    // Update P&L if settled (retro bets are historical — PP balance is NOT adjusted
+    // because the historical activity is already baked into the seeded PP balance)
     if (savedStatus === 'won' || savedStatus === 'lost') {
         const newPnl = getAllTimePnl(member) + (profit || 0);
         updates[`/users/${member}/totalPnl`] = Math.round(newPnl * 100) / 100;
         if (savedStatus === 'won') {
             updates[`/users/${member}/betsWon`] = (appData.users[member]?.betsWon || 0) + 1;
         }
-    }
-
-    // Update PP balance: deduct stake on placed/won/lost, add returns on won
-    const ppBalance = appData.config.ppBalance ?? PP_BALANCE_SEED;
-    if (savedStatus === 'placed') {
-        updates['/config/ppBalance'] = Math.round((ppBalance - totalStake) * 100) / 100;
-    } else if (savedStatus === 'won' && returns > 0) {
-        updates['/config/ppBalance'] = Math.round((ppBalance + returns - totalStake) * 100) / 100;
-    } else if (savedStatus === 'lost' && type !== 'freeBet') {
-        updates['/config/ppBalance'] = Math.round((ppBalance - totalStake) * 100) / 100;
     }
 
     await db.ref('/').update(updates);
@@ -2954,10 +2984,10 @@ async function importPpCsv() {
             : (isFb ? 0 : -totalStake);
 
         const u = matchedBet.user;
-        const betsNeeded = Math.ceil(matchedBet.stake / BET_VALUE);
+        const tokensDeducted = matchedBet.tokensDeducted || Math.ceil(matchedBet.stake / BET_VALUE) || 1;
         userPnlDeltas[u] = (userPnlDeltas[u] || 0) + profit;
         if (isWon) {
-            userBalDeltas[u] = (userBalDeltas[u] || 0) + betsNeeded + (isBigOdds(matchedBet.odds) ? 1 : 0);
+            userBalDeltas[u] = (userBalDeltas[u] || 0) + tokensDeducted + (isBigOdds(matchedBet.odds) ? 1 : 0);
             userWonDeltas[u] = (userWonDeltas[u] || 0) + 1;
         }
 
