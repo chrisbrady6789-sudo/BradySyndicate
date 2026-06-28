@@ -1357,7 +1357,7 @@ async function ensureUsers() {
         };
     }
     if (Object.keys(updates).length) await db.ref('/').update(updates);
-    if (!appData.currentWeek) await db.ref('/currentWeek').set(1);
+    if (!currentWeek) await db.ref('/currentWeek').set(1);
 }
 
 // ══════════════════════════════════════════════════════════════
