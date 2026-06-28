@@ -2748,7 +2748,7 @@ async function advanceWeek() {
     const bpw = appData.config?.betsPerWeek || BETS_PER_WEEK;
     if (!confirm(`Advance to Week ${currentWeek + 1}? This will:\n- Add ${bpw} bets to everyone's balance (max ${MAX_CARRY})\n- Apply activity rule (forfeit 1 bet if no bet in last ${ACTIVITY_WEEKS} weeks)`)) return;
 
-    const updates = { '/currentWeek': currentWeek + 1 };
+    const updates = { 'currentWeek': currentWeek + 1 };
 
     for (const m of MEMBERS) {   // Group doesn't receive weekly bet allocations
         const balance = getUserBalance(m);
@@ -2764,7 +2764,13 @@ async function advanceWeek() {
         updates['/users/' + m + '/betBalance'] = newBalance;
     }
 
-    await db.ref('/').update(updates);
+    // Write user balances via multi-location update, then write currentWeek directly
+    // (direct set is more reliable for root-level keys)
+    delete updates['currentWeek'];
+    await Promise.all([
+        db.ref('/').update(updates),
+        db.ref('currentWeek').set(currentWeek + 1)
+    ]);
     document.getElementById('adminWeekMsg').innerHTML = '<div class="alert alert-success">Week advanced! Balances updated.</div>';
     setTimeout(() => document.getElementById('adminWeekMsg').innerHTML = '', 4000);
 
