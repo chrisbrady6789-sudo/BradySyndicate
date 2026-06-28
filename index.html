@@ -1220,6 +1220,7 @@ let feedSort     = 'newest';
 let adminTab     = 'week';
 let settlingBetId = null;
 let placingBetId  = null;
+let rootListener  = null;  // Firebase value listener — detached on logout
 
 // ══════════════════════════════════════════════════════════════
 //  BOOT
@@ -1272,6 +1273,7 @@ async function doLogin() {
 }
 
 function logout() {
+    if (rootListener) { db.ref('/').off('value', rootListener); rootListener = null; }
     sessionStorage.removeItem('synUser');
     currentUser = null; isAdmin = false; isPlacer = false;
     document.getElementById('loginPage').classList.remove('hidden');
@@ -1294,9 +1296,7 @@ function startApp() {
         document.getElementById('nav-queue').classList.remove('hidden');
     }
 
-    // Populate free-bet override dropdown
-    const sel = document.getElementById('freeBetOverride');
-    ALL_USERS.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o); });
+    loadSeenStatuses();
 
     // Populate feed member filter
     const mf = document.getElementById('feedMemberFilter');
@@ -1306,7 +1306,7 @@ function startApp() {
     const fbSel2 = document.getElementById('fbAssignedTo');
     ALL_USERS.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; fbSel2.appendChild(o); });
 
-    db.ref('/').on('value', snap => {
+    rootListener = snap => {
         const d = snap.val() || {};
         appData.bets     = d.bets     || {};
         appData.users    = d.users    || {};
@@ -1326,7 +1326,8 @@ function startApp() {
         ensureUsers();
         updateFeedBadge();
         renderPage(currentPage);
-    });
+    };
+    db.ref('/').on('value', rootListener);
 
     showPage('dashboard');
 }
@@ -1338,7 +1339,6 @@ async function ensureUsers() {
             updates['/users/' + m + '/name']       = m;
             updates['/users/' + m + '/betBalance'] = m === GROUP_MEMBER ? 99 : INITIAL_BETS;
             updates['/users/' + m + '/totalPnl']   = m === GROUP_MEMBER ? GROUP_PNL_SEED : 0;
-            updates['/users/' + m + '/betsPlaced'] = 0;
             updates['/users/' + m + '/betsWon']    = 0;
             updates['/users/' + m + '/lastBetWeek'] = 0;
         }
@@ -1347,14 +1347,11 @@ async function ensureUsers() {
     if (appData.config.ppBalance == null) {
         updates['/config/ppBalance'] = PP_BALANCE_SEED;
     }
-    // Seed the initial England vs Ghana free bet if no list exists yet
+    // Seed the free bet list node once on a fresh database so it always exists
+    // (if we seed a real free bet here it re-appears every time the admin clears the list,
+    //  because Firebase deletes empty nodes and the absence triggers this guard again)
     if (!appData.config.freeBetList) {
-        const fbId = db.ref('/config/freeBetList').push().key;
-        updates[`/config/freeBetList/${fbId}`] = {
-            id: fbId, amount: PP_FREE_BET_SEED,
-            description: 'England vs Ghana only',
-            assignedTo: '', addedAt: Date.now()
-        };
+        updates['/config/freeBetList'] = { _init: true };
     }
     if (Object.keys(updates).length) await db.ref('/').update(updates);
     if (!currentWeek) await db.ref('/currentWeek').set(1);
@@ -1796,6 +1793,17 @@ function copyBetMsg() {
 // ── Feed badge: count my bets that changed to placed/won/lost since last seen ──
 let seenBetStatuses = {};   // betId → last known status
 
+function loadSeenStatuses() {
+    try {
+        const raw = localStorage.getItem('synSeen_' + currentUser);
+        seenBetStatuses = raw ? JSON.parse(raw) : {};
+    } catch (e) { console.warn('Could not load seen statuses', e); seenBetStatuses = {}; }
+}
+
+function saveSeenStatuses() {
+    try { localStorage.setItem('synSeen_' + currentUser, JSON.stringify(seenBetStatuses)); } catch (e) { console.warn('Could not save seen statuses', e); }
+}
+
 function updateFeedBadge() {
     let unseen = 0;
     Object.values(appData.bets).forEach(b => {
@@ -1822,6 +1830,7 @@ function clearFeedBadge() {
     Object.values(appData.bets).forEach(b => {
         if (b.user === currentUser) seenBetStatuses[b.id] = b.status;
     });
+    saveSeenStatuses();
     const badge = document.getElementById('nav-feed')?.querySelector('.nav-badge');
     if (badge) badge.remove();
 }
@@ -1910,10 +1919,14 @@ function renderFeed() {
 // ══════════════════════════════════════════════════════════════
 function setLbView(v) {
     lbView = v;
-    document.getElementById('lbViewAll').className  = v === 'all'  ? 'btn btn-sm' : 'btn btn-sm btn-ghost';
-    document.getElementById('lbViewWeek').className = v === 'week' ? 'btn btn-sm' : 'btn btn-sm btn-ghost';
-    if (v === 'all')  { document.getElementById('lbViewAll').style.background  = 'var(--navy-mid)'; document.getElementById('lbViewAll').style.color  = '#fff'; }
-    if (v === 'week') { document.getElementById('lbViewWeek').style.background = 'var(--navy-mid)'; document.getElementById('lbViewWeek').style.color = '#fff'; }
+    const allBtn  = document.getElementById('lbViewAll');
+    const weekBtn = document.getElementById('lbViewWeek');
+    allBtn.className  = v === 'all'  ? 'btn btn-sm' : 'btn btn-sm btn-ghost';
+    weekBtn.className = v === 'week' ? 'btn btn-sm' : 'btn btn-sm btn-ghost';
+    allBtn.style.background  = v === 'all'  ? 'var(--navy-mid)' : '';
+    allBtn.style.color       = v === 'all'  ? '#fff' : '';
+    weekBtn.style.background = v === 'week' ? 'var(--navy-mid)' : '';
+    weekBtn.style.color      = v === 'week' ? '#fff' : '';
     renderLeaderboard();
 }
 
@@ -2095,11 +2108,13 @@ function betProfitHtml(b) {
         return `<span class="bet-profit-large pnl-pos">+€${Number.parseFloat(b.profit).toFixed(2)}</span>`;
     }
     if (b.status === 'lost') {
-        const isEw = b.type === 'ew';
         const isFb = b.type === 'freeBet';
+        if (isFb) return `<span class="bet-profit-large pnl-neg">€0</span>`;
+        // Use stored profit when available (e.g. EW partial place-only result)
+        if (b.profit != null) return `<span class="bet-profit-large pnl-neg">${Number.parseFloat(b.profit).toFixed(2) < 0 ? '' : '-'}€${Math.abs(Number.parseFloat(b.profit)).toFixed(2)}</span>`;
+        const isEw = b.type === 'ew';
         const total = isEw ? (Number.parseFloat(b.stake) * 2).toFixed(2) : Number.parseFloat(b.stake).toFixed(2);
-        const lossDisplay = isFb ? '€0' : `-€${total}`;
-        return `<span class="bet-profit-large pnl-neg">${lossDisplay}</span>`;
+        return `<span class="bet-profit-large pnl-neg">-€${total}</span>`;
     }
     return '';
 }
@@ -2274,6 +2289,15 @@ async function confirmPlaced() {
     const isEw = placedType === 'ew';
     const isFb = placedType === 'freeBet';
     const totalStake = isEw ? actualStake * 2 : actualStake;
+
+    // Validate free bet selection
+    if (isFb) {
+        const fbId = document.getElementById('freeBetPicker')?.value;
+        if (!fbId) {
+            alert('Please select which free bet to use.');
+            return;
+        }
+    }
 
     const updates = {
         [`/bets/${b.id}/status`]:      'placed',
@@ -2560,24 +2584,28 @@ function renderAdmin() {
             Current: <strong>${weekLabel(currentWeek)}</strong> &nbsp;|&nbsp; ${getWeekDates(currentWeek)}
         </div>`;
 
-    // Populate freeBetOverride select
+    // Populate freeBetOverride select (repopulate each time to stay in sync)
     const fbSel = document.getElementById('freeBetOverride');
-    if (fbSel && fbSel.options.length === 1) {
+    if (fbSel) {
+        const prev = fbSel.value;
+        fbSel.innerHTML = '<option value="">— auto (last week\'s leader) —</option>';
         MEMBERS.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; fbSel.appendChild(o); });
+        fbSel.value = appData.config?.freeBetOverride || prev || '';
     }
-    if (fbSel) fbSel.value = appData.config?.freeBetOverride || '';
 
-    // Populate retro member select (includes Group)
+    // Populate retro member select (includes Group) — only on first render
     const retroSel = document.getElementById('retroMember');
-    if (retroSel && !retroSel.options.length) {
+    if (retroSel && !retroSel.dataset.populated) {
         ALL_USERS.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; retroSel.appendChild(o); });
+        retroSel.dataset.populated = '1';
+        document.getElementById('retroWeek').value = currentWeek;  // only set default once
     }
-    document.getElementById('retroWeek').value = currentWeek;
 
-    // Populate editPnl member select (includes Group)
+    // Populate editPnl member select (includes Group) — only on first render
     const pnlSel = document.getElementById('editPnlMember');
-    if (pnlSel && !pnlSel.options.length) {
+    if (pnlSel && !pnlSel.dataset.populated) {
         ALL_USERS.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; pnlSel.appendChild(o); });
+        pnlSel.dataset.populated = '1';
     }
 
     if (adminTab === 'users')  renderAdminUsers();
@@ -2645,7 +2673,7 @@ async function resetPin(user) {
 
 function renderAdminConfig() {
     const c = appData.config || {};
-    document.getElementById('cfgStartDate').value      = c.startDate || '2026-06-19';
+    document.getElementById('cfgStartDate').value      = c.startDate || '2026-06-20';
     document.getElementById('cfgBetsPerWeek').value    = c.betsPerWeek || BETS_PER_WEEK;
     document.getElementById('cfgPpBalance').value      = (c.ppBalance  ?? PP_BALANCE_SEED).toFixed(2);
     document.getElementById('cfgDiscord').value        = c.discordWebhook || '';
@@ -2799,6 +2827,7 @@ async function addRetroBet() {
 
     if (!selection) { msg.innerHTML = '<div class="alert alert-error">Please enter a selection.</div>'; return; }
     if (!week)      { msg.innerHTML = '<div class="alert alert-error">Please enter a week number.</div>'; return; }
+    if (!stake || isNaN(stake) || stake <= 0) { msg.innerHTML = '<div class="alert alert-error">Please enter a valid stake.</div>'; return; }
 
     const betId = db.ref('/bets').push().key;
     const totalStake = type === 'ew' ? stake * 2 : stake;
@@ -2833,6 +2862,16 @@ async function addRetroBet() {
         if (savedStatus === 'won') {
             updates[`/users/${member}/betsWon`] = (appData.users[member]?.betsWon || 0) + 1;
         }
+    }
+
+    // Update PP balance: deduct stake on placed/won/lost, add returns on won
+    const ppBalance = appData.config.ppBalance ?? PP_BALANCE_SEED;
+    if (savedStatus === 'placed') {
+        updates['/config/ppBalance'] = Math.round((ppBalance - totalStake) * 100) / 100;
+    } else if (savedStatus === 'won' && returns > 0) {
+        updates['/config/ppBalance'] = Math.round((ppBalance + returns - totalStake) * 100) / 100;
+    } else if (savedStatus === 'lost' && type !== 'freeBet') {
+        updates['/config/ppBalance'] = Math.round((ppBalance - totalStake) * 100) / 100;
     }
 
     await db.ref('/').update(updates);
@@ -2880,9 +2919,9 @@ async function importPpCsv() {
         const result    = (cols[resCol] || '').toLowerCase();
         if (!selection) { skipped++; continue; }
 
-        // Try to match against pending/placed bets
+        // Try to match against any pending/placed bet (not just current week — allows late imports)
         const pendingBets = Object.values(appData.bets)
-            .filter(b => ['pending','placed'].includes(b.status) && b.week === currentWeek);
+            .filter(b => ['pending','placed'].includes(b.status));
 
         const matchedBet = pendingBets.find(b =>
             normalizeStr(b.selection).includes(normalizeStr(selection)) ||
@@ -2925,6 +2964,31 @@ async function importPpCsv() {
         if (userWonDeltas[u]) {
             updates[`/users/${u}/betsWon`] = (appData.users[u]?.betsWon || 0) + userWonDeltas[u];
         }
+    }
+
+    // Update PP balance: sum all returns from settled bets
+    let ppDelta = 0;
+    for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g,'').trim());
+        const selection = cols[selCol] || '';
+        if (!selection) continue;
+        const pendingBets = Object.values(appData.bets).filter(b => ['pending','placed'].includes(b.status));
+        const matchedBet = pendingBets.find(b =>
+            normalizeStr(b.selection).includes(normalizeStr(selection)) ||
+            normalizeStr(selection).includes(normalizeStr(b.selection))
+        );
+        if (!matchedBet) continue;
+        const returns = Number.parseFloat(cols[retCol]) || 0;
+        const result  = (cols[resCol] || '').toLowerCase();
+        const isWon   = result.includes('won') || result.includes('win') || returns > matchedBet.stake;
+        if (isWon && returns > 0) {
+            ppDelta += returns;
+        }
+        // Stake was already deducted when the bet was placed; nothing extra to deduct on loss
+    }
+    if (ppDelta !== 0) {
+        const ppBalance = appData.config.ppBalance ?? PP_BALANCE_SEED;
+        updates['/config/ppBalance'] = Math.round((ppBalance + ppDelta) * 100) / 100;
     }
 
     if (Object.keys(updates).length) await db.ref('/').update(updates);
@@ -3164,6 +3228,7 @@ function patchCommentSection(betId) {
 // ══════════════════════════════════════════════════════════════
 function getActiveFbList() {
     return Object.values(appData.config.freeBetList || {})
+        .filter(fb => fb && fb.id)
         .sort((a, b) => a.addedAt - b.addedAt);
 }
 
