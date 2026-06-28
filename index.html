@@ -1975,7 +1975,7 @@ function renderLeaderboard() {
     const settled = allBets.filter(b => b.status === 'won' || b.status === 'lost');
     const totalStaked = settled.reduce((s,b) => s + (Number.parseFloat(b.stake)||0), 0);
     const totalWon = settled.filter(b => b.status === 'won').length;
-    const bigWins  = settled.filter(b => b.status === 'won' && isBigOdds(b.odds)).length;
+    const bigWins  = settled.filter(b => b.status === 'won' && isBigOdds(b.oddsPlaced || b.odds)).length;
     document.getElementById('lbStats').innerHTML = `
         <div class="stat-card"><div class="stat-val">${allBets.length}</div><div class="stat-label">Total Bets</div></div>
         <div class="stat-card"><div class="stat-val">${totalWon}</div><div class="stat-label">Winners</div></div>
@@ -2352,7 +2352,8 @@ function updateSettleReturnsHint() {
     const totalStake = isEw ? b.stake * 2 : b.stake;
 
     if (result === 'lost' || result === 'void') {
-        hint.textContent = result === 'void' ? 'Stake will be refunded to the member.' : '';
+        const isFb = b.type === 'freeBet';
+        hint.textContent = result === 'void' ? (isFb ? 'Free bet — no stake to refund.' : 'Stake will be refunded to the member.') : '';
         hint.style.color = 'var(--text-light)';
         return;
     }
@@ -2386,12 +2387,14 @@ function calcSettleOutcome(b, result, returns) {
 }
 
 function calcSettleBalance(b, settleStatus, balance) {
+    const isFb = b.type === 'freeBet';
     const betsNeeded = Math.ceil(b.stake / BET_VALUE);
     if (settleStatus === 'won') {
         const bonus = isBigOdds(b.oddsPlaced || b.odds) ? 1 : 0;
         return Math.min(MAX_CARRY, balance + betsNeeded + bonus);
     }
-    if (settleStatus === 'void') return Math.min(MAX_CARRY, balance + betsNeeded);
+    // Free bets: the named free bet was already consumed — no token refund on void
+    if (settleStatus === 'void') return isFb ? balance : Math.min(MAX_CARRY, balance + betsNeeded);
     return balance;
 }
 
@@ -2707,8 +2710,8 @@ async function saveSyndicateSettings() {
     const startDate   = document.getElementById('cfgStartDate').value;
     const betsPerWeek = parseInt(document.getElementById('cfgBetsPerWeek').value) || BETS_PER_WEEK;
     await db.ref('/').update({
-        '/config/startDate':   startDate,
-        '/config/betsPerWeek': betsPerWeek
+        'config/startDate':   startDate,
+        'config/betsPerWeek': betsPerWeek
     });
     const msg = document.getElementById('cfgSettingsMsg');
     msg.innerHTML = '<div class="alert alert-success">Settings saved.</div>';
@@ -2774,8 +2777,8 @@ async function advanceWeek() {
     document.getElementById('adminWeekMsg').innerHTML = '<div class="alert alert-success">Week advanced! Balances updated.</div>';
     setTimeout(() => document.getElementById('adminWeekMsg').innerHTML = '', 4000);
 
-    // Auto-backup: email a full JSON export to placers
-    try { await emailWeeklyBackup(currentWeek); } catch (_) { /* silent */ }
+    // Auto-backup: email a full JSON export to placers (use +1 since currentWeek hasn't refreshed yet)
+    try { await emailWeeklyBackup(currentWeek + 1); } catch (_) { /* silent */ }
 }
 
 async function saveFreeBetOverride() {
@@ -2865,6 +2868,10 @@ async function importPpCsv() {
 
     let matched = 0, skipped = 0;
     const updates = {};
+    // Track running totals per user so multiple bets for the same user accumulate correctly
+    const userPnlDeltas   = {};
+    const userBalDeltas   = {};
+    const userWonDeltas   = {};
 
     for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g,'').trim());
@@ -2893,22 +2900,31 @@ async function importPpCsv() {
             ? (isFb ? returns : returns - totalStake)
             : (isFb ? 0 : -totalStake);
 
-        const balance    = getUserBalance(matchedBet.user);
+        const u = matchedBet.user;
         const betsNeeded = Math.ceil(matchedBet.stake / BET_VALUE);
-        let newBalance = balance;
+        userPnlDeltas[u] = (userPnlDeltas[u] || 0) + profit;
         if (isWon) {
-            newBalance = Math.min(MAX_CARRY, balance + betsNeeded + (isBigOdds(matchedBet.odds) ? 1 : 0));
+            userBalDeltas[u] = (userBalDeltas[u] || 0) + betsNeeded + (isBigOdds(matchedBet.odds) ? 1 : 0);
+            userWonDeltas[u] = (userWonDeltas[u] || 0) + 1;
         }
-        const newPnl = getAllTimePnl(matchedBet.user) + profit;
 
-        updates[`/bets/${matchedBet.id}/status`]    = status;
-        updates[`/bets/${matchedBet.id}/profit`]     = profit;
-        updates[`/bets/${matchedBet.id}/returns`]    = returns;
-        updates[`/bets/${matchedBet.id}/settledAt`]  = Date.now();
-        updates[`/users/${matchedBet.user}/betBalance`] = newBalance;
-        updates[`/users/${matchedBet.user}/totalPnl`]   = newPnl;
-        if (isWon) updates[`/users/${matchedBet.user}/betsWon`] = (appData.users[matchedBet.user]?.betsWon || 0) + 1;
+        updates[`/bets/${matchedBet.id}/status`]   = status;
+        updates[`/bets/${matchedBet.id}/profit`]    = profit;
+        updates[`/bets/${matchedBet.id}/returns`]   = returns;
+        updates[`/bets/${matchedBet.id}/settledAt`] = Date.now();
         matched++;
+    }
+
+    // Apply per-user aggregated changes (prevents overwrite when multiple bets per user)
+    for (const u of Object.keys(userPnlDeltas)) {
+        const newPnl = Math.round((getAllTimePnl(u) + userPnlDeltas[u]) * 100) / 100;
+        updates[`/users/${u}/totalPnl`] = newPnl;
+        if (userBalDeltas[u]) {
+            updates[`/users/${u}/betBalance`] = Math.min(MAX_CARRY, getUserBalance(u) + userBalDeltas[u]);
+        }
+        if (userWonDeltas[u]) {
+            updates[`/users/${u}/betsWon`] = (appData.users[u]?.betsWon || 0) + userWonDeltas[u];
+        }
     }
 
     if (Object.keys(updates).length) await db.ref('/').update(updates);
