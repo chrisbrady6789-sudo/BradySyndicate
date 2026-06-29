@@ -2486,9 +2486,10 @@ function calcSettleBalance(b, settleStatus, balance) {
     const isFb = b.type === 'freeBet';
     // Use the stored token count so refunds always mirror what was actually deducted.
     // Fall back to ceil(totalStake / BET_VALUE) for bets created before this field existed.
+    // NOTE: use != null (not ||) so that tokensDeducted=0 (free-bet-flagged submit) is preserved.
     const isEw = b.type === 'ew';
     const totalStake = isEw ? b.stake * 2 : b.stake;
-    const tokensDeducted = b.tokensDeducted || Math.ceil(totalStake / BET_VALUE) || 1;
+    const tokensDeducted = b.tokensDeducted != null ? b.tokensDeducted : (Math.ceil(totalStake / BET_VALUE) || 1);
     if (settleStatus === 'won') {
         const bonus = isBigOdds(b.oddsPlaced || b.odds) ? 1 : 0;
         return Math.min(MAX_CARRY, balance + tokensDeducted + bonus);
@@ -2504,6 +2505,9 @@ function calcSettlePpUpdates(b, settleStatus, returns, totalStake) {
     if (settleStatus === 'void') {
         // Free bet voids: the named free bet was already consumed at placement — no cash refund
         if (isFb) return {};
+        // Only refund PP cash if the bet was actually placed (PP stake was deducted at placement).
+        // Pending bets were never placed, so PP balance was never touched.
+        if (b.status === 'pending') return {};
         return { '/config/ppBalance': Math.round((ppBalance + totalStake) * 100) / 100 };
     }
     if (returns > 0) return { '/config/ppBalance': Math.round((ppBalance + returns) * 100) / 100 };
@@ -2612,8 +2616,11 @@ async function voidBet(betId) {
     const balance    = getUserBalance(b.user);
     const isEw = b.type === 'ew';
     const totalStake = isEw ? b.stake * 2 : b.stake;
-    const tokensDeducted = b.tokensDeducted || Math.ceil(totalStake / BET_VALUE) || 1;
-    const newBalance = Math.min(MAX_CARRY, balance + (b.type === 'freeBet' ? 0 : tokensDeducted));
+    // Use != null so tokensDeducted=0 (free-bet-flagged submit) is preserved, not replaced by 1
+    const tokensDeducted = b.tokensDeducted != null ? b.tokensDeducted : (Math.ceil(totalStake / BET_VALUE) || 1);
+    // Don't refund tokens for free bets (b.type === 'freeBet') OR free-bet-flagged submits (tokensDeducted === 0)
+    const refundTokens = b.type !== 'freeBet' && tokensDeducted > 0;
+    const newBalance = refundTokens ? Math.min(MAX_CARRY, balance + tokensDeducted) : balance;
     const updates = {
         [`/bets/${betId}/status`]: 'void',
         [`/users/${b.user}/betBalance`]: newBalance,
@@ -2628,14 +2635,18 @@ async function deleteBet(betId) {
     const b = appData.bets[betId];
     if (!b) return;
 
-    // Refund balance if the bet was still active (pending/placed)
+    // Refund balance if the bet was still active (pending/placed) and tokens were actually deducted.
+    // Check tokensDeducted != null (not || 1) so free-bet-flagged submits (tokensDeducted=0) are not refunded.
+    // Also skip refund for fully-placed free bets (b.type === 'freeBet').
     if (['pending', 'placed'].includes(b.status) && b.type !== 'freeBet') {
         const balance        = getUserBalance(b.user);
         const isEwD          = b.type === 'ew';
         const totalStakeD    = isEwD ? b.stake * 2 : b.stake;
-        const tokensDeducted = b.tokensDeducted || Math.ceil(totalStakeD / BET_VALUE) || 1;
-        const newBalance     = Math.min(MAX_CARRY, balance + tokensDeducted);
-        await db.ref('/users/' + b.user + '/betBalance').set(newBalance);
+        const tokensDeducted = b.tokensDeducted != null ? b.tokensDeducted : (Math.ceil(totalStakeD / BET_VALUE) || 1);
+        if (tokensDeducted > 0) {
+            const newBalance = Math.min(MAX_CARRY, balance + tokensDeducted);
+            await db.ref('/users/' + b.user + '/betBalance').set(newBalance);
+        }
     }
 
     await db.ref('/bets/' + betId).remove();
@@ -3009,7 +3020,7 @@ async function importPpCsv() {
             : (isFb ? 0 : -totalStake);
 
         const u = matchedBet.user;
-        const tokensDeducted = matchedBet.tokensDeducted || Math.ceil(matchedBet.stake / BET_VALUE) || 1;
+        const tokensDeducted = matchedBet.tokensDeducted != null ? matchedBet.tokensDeducted : (Math.ceil(matchedBet.stake / BET_VALUE) || 1);
         userPnlDeltas[u] = (userPnlDeltas[u] || 0) + profit;
         if (isWon) {
             userBalDeltas[u] = (userBalDeltas[u] || 0) + tokensDeducted + (isBigOdds(matchedBet.odds) ? 1 : 0);
