@@ -730,6 +730,13 @@
         </div>
 
         <button class="btn btn-gold" style="margin-top:4px" onclick="submitBet()">Submit Bet Request</button>
+
+        <div style="margin-top:14px;display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="submitFreeBet" style="width:16px;height:16px;accent-color:var(--amber);cursor:pointer">
+            <label for="submitFreeBet" style="cursor:pointer;font-size:0.88em;color:var(--text-mid)">
+                🎁 This is a <strong>free bet</strong> — don't deduct a token
+            </label>
+        </div>
     </div>
 </div>
 
@@ -1720,10 +1727,11 @@ async function submitBet() {
         }
     }
 
-    // Deduct 1 bet token — placer will confirm exact stake/type when placing.
+    // Deduct 1 bet token unless the user flagged this as a free bet.
     // We store how many tokens were actually deducted so refunds are always exact.
-    const tokensDeducted = 1;
-    const newBalance = Math.max(0, balance - tokensDeducted);
+    const isFreeBetRequest = document.getElementById('submitFreeBet')?.checked === true;
+    const tokensDeducted = isFreeBetRequest ? 0 : 1;
+    const newBalance = isFreeBetRequest ? balance : Math.max(0, balance - 1);
 
     const bet = {
         id: betId,
@@ -1732,6 +1740,7 @@ async function submitBet() {
         stake: BET_VALUE,           // default; placer will confirm actual stake
         type: 'single',             // default; placer will confirm type
         tokensDeducted,             // exact tokens taken at submit — used for all refunds
+        ...(isFreeBetRequest ? { isFreebet: true } : {}),
         event: '',
         notes: '',
         status: 'pending',
@@ -1741,11 +1750,14 @@ async function submitBet() {
         ...(screenshotUrl ? { screenshotUrl, screenshotPublicId, hasScreenshot: true } : {})
     };
 
-    await Promise.all([
+    const dbWrites = [
         db.ref('/bets/' + betId).set(bet),
-        db.ref('/users/' + currentUser + '/betBalance').set(newBalance),
         db.ref('/users/' + currentUser + '/lastBetWeek').set(currentWeek)
-    ]);
+    ];
+    if (!isFreeBetRequest) {
+        dbWrites.push(db.ref('/users/' + currentUser + '/betBalance').set(newBalance));
+    }
+    await Promise.all(dbWrites);
 
     msg.innerHTML = '<div class="alert alert-success">Bet submitted! ✅</div>';
 
@@ -1755,6 +1767,8 @@ async function submitBet() {
     document.getElementById('betScreenshot').value = '';
     document.getElementById('screenshotPreview').style.display = 'none';
     document.getElementById('screenshotDropText').style.display = '';
+    const fbCb = document.getElementById('submitFreeBet');
+    if (fbCb) fbCb.checked = false;
     setInputMode('text');
 
     // Build WhatsApp deep link and show popup modal
@@ -2200,6 +2214,7 @@ function betCardHtml(b, showUser, showActions) {
                 ${showUser ? `<div class="bet-user-tag" style="margin-bottom:4px">👤 ${esc(b.user)}</div>` : ''}
                 <div class="bet-selection">${esc(b.selection)}</div>
                 ${b.description ? `<div class="bet-detail">🏷 ${esc(b.description)}</div>` : ''}
+                ${b.isFreebet && b.status === 'pending' ? `<div class="bet-detail" style="color:var(--amber);font-weight:600;font-size:0.8em">🎁 Member flagged as free bet</div>` : ''}
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
                 ${statusChip(b.status)}
@@ -2284,8 +2299,18 @@ async function markPlaced(betId) {
             <button class="btn btn-ghost" onclick="closePlacedModal()">Cancel</button>
         </div>`;
     document.getElementById('placedModal').classList.remove('hidden');
-}
 
+    // If the member flagged this as a free bet at submit time, pre-select Free Bet
+    // in the type dropdown and show the free bet picker immediately.
+    if (b.isFreebet) {
+        const typeSelect = document.getElementById('placedType');
+        if (typeSelect) {
+            typeSelect.value = 'freeBet';
+            updateFreeBetPicker();
+            updatePlacedStakeHint();
+        }
+    }
+}
 function closePlacedModal() {
     document.getElementById('placedModal').classList.add('hidden');
     placingBetId = null;
@@ -2346,8 +2371,8 @@ async function confirmPlaced() {
 
     // Reconcile tokens if the placer changed the stake from the submitted default.
     // The correct token cost is ceil(totalStake / BET_VALUE); the member already paid
-    // b.tokensDeducted (default 1) at submit time.
-    const alreadyDeducted = b.tokensDeducted || 1;
+    // b.tokensDeducted at submit time (0 if they flagged it as a free bet).
+    const alreadyDeducted = b.tokensDeducted != null ? b.tokensDeducted : 1;
     const correctTokens   = isFb ? 0 : Math.ceil(totalStake / BET_VALUE);
     const tokenDiff       = correctTokens - alreadyDeducted;  // positive = owe more; negative = overpaid
     if (tokenDiff !== 0) {
