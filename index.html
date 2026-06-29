@@ -1695,8 +1695,9 @@ async function submitBet() {
     }
 
     const balance = getUserBalance(currentUser);
-    if (balance < 1) {
-        msg.innerHTML = `<div class="alert alert-error">No bets available! You have 0 bet tokens.</div>`;
+    const isFreeBetRequest = document.getElementById('submitFreeBet')?.checked === true;
+    if (balance < 1 && !isFreeBetRequest) {
+        msg.innerHTML = `<div class="alert alert-error">No bets available! You have 0 bet tokens. Tick "free bet" if this is a free bet.</div>`;
         return;
     }
 
@@ -1729,7 +1730,6 @@ async function submitBet() {
 
     // Deduct 1 bet token unless the user flagged this as a free bet.
     // We store how many tokens were actually deducted so refunds are always exact.
-    const isFreeBetRequest = document.getElementById('submitFreeBet')?.checked === true;
     const tokensDeducted = isFreeBetRequest ? 0 : 1;
     const newBalance = isFreeBetRequest ? balance : Math.max(0, balance - 1);
 
