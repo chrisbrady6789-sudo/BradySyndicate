@@ -1363,6 +1363,20 @@ async function ensureUsers() {
     }
     if (Object.keys(updates).length) await db.ref('/').update(updates);
     if (!currentWeek) await db.ref('/currentWeek').set(1);
+    await migrateSettledWeek();
+}
+
+async function migrateSettledWeek() {
+    const base = appData.config?.startDate ? new Date(appData.config.startDate) : new Date('2026-06-19');
+    const baseMs = base.getTime() + 12 * 60 * 60 * 1000;
+    const updates = {};
+    Object.values(appData.bets).forEach(b => {
+        if (b.settledWeek != null) return;
+        if (b.status !== 'won' && b.status !== 'lost') return;
+        if (!b.settledAt) return;
+        updates[`/bets/${b.id}/settledWeek`] = Math.max(1, Math.floor((b.settledAt - baseMs) / (7 * 24 * 60 * 60 * 1000)) + 1);
+    });
+    if (Object.keys(updates).length) await db.ref('/').update(updates);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1425,7 +1439,9 @@ function getWeekDates(weekNum) {
 // Used to assign settled bets to the week they resolved in (not the week they were submitted).
 function tsToWeek(ts) {
     const base = appData.config?.startDate ? new Date(appData.config.startDate) : new Date('2026-06-20');
-    const diff = ts - base.getTime();
+    // Weeks start at noon (12:00) on Friday — add 12h so Friday morning falls in the current week
+    const baseMs = base.getTime() + 12 * 60 * 60 * 1000;
+    const diff = ts - baseMs;
     return Math.max(1, Math.floor(diff / (7 * 24 * 60 * 60 * 1000)) + 1);
 }
 
@@ -1466,7 +1482,12 @@ function getWeeklyPnl(user, week) {
         .filter(b => b.status === 'won' || b.status === 'lost')
         .filter(b => {
             if (week == null) return true;
-            return b.settledAt ? tsToWeek(b.settledAt) === week : b.week === week;
+            // Prefer the stored settledWeek (set by the admin when the bet is settled),
+            // fall back to calendar calculation, then submission week as last resort.
+            let sw = b.week;
+            if (b.settledWeek != null) sw = b.settledWeek;
+            else if (b.settledAt) sw = tsToWeek(b.settledAt);
+            return sw === week;
         })
         .reduce((sum, b) => {
             if (b.profit != null) return sum + parseFloat(b.profit);
@@ -1995,10 +2016,14 @@ function buildLbMemberRow(m, isWeek) {
     const pnl   = isWeek ? getWeeklyPnl(m, currentWeek) : getAllTimePnl(m);
     // For the weekly columns, count bets that settled this week (not submission week)
     const bets  = isWeek
-        ? Object.values(appData.bets).filter(b =>
-            b.user === m &&
-            (b.status === 'won' || b.status === 'lost') &&
-            (b.settledAt ? tsToWeek(b.settledAt) === currentWeek : b.week === currentWeek))
+        ? Object.values(appData.bets).filter(b => {
+            if (b.user !== m) return false;
+            if (b.status !== 'won' && b.status !== 'lost') return false;
+            let sw = b.week;
+            if (b.settledWeek != null) sw = b.settledWeek;
+            else if (b.settledAt) sw = tsToWeek(b.settledAt);
+            return sw === currentWeek;
+          })
         : getUserBets(m, null).filter(b => b.status === 'won' || b.status === 'lost');
     const won   = bets.filter(b => b.status === 'won').length;
     const sr    = bets.length ? Math.round((won / bets.length) * 100) : 0;
@@ -2532,6 +2557,7 @@ async function settleBet() {
         [`/bets/${b.id}/profit`]:        profit,
         [`/bets/${b.id}/returns`]:       returns,
         [`/bets/${b.id}/settledAt`]:     Date.now(),
+        [`/bets/${b.id}/settledWeek`]:   currentWeek,
         [`/users/${b.user}/betBalance`]: newBalance,
         [`/users/${b.user}/totalPnl`]:   newTotalPnl,
         ...calcSettlePpUpdates(b, settleStatus, returns, totalStake),
@@ -3027,10 +3053,11 @@ async function importPpCsv() {
             userWonDeltas[u] = (userWonDeltas[u] || 0) + 1;
         }
 
-        updates[`/bets/${matchedBet.id}/status`]   = status;
-        updates[`/bets/${matchedBet.id}/profit`]    = profit;
-        updates[`/bets/${matchedBet.id}/returns`]   = returns;
-        updates[`/bets/${matchedBet.id}/settledAt`] = Date.now();
+        updates[`/bets/${matchedBet.id}/status`]      = status;
+        updates[`/bets/${matchedBet.id}/profit`]      = profit;
+        updates[`/bets/${matchedBet.id}/returns`]     = returns;
+        updates[`/bets/${matchedBet.id}/settledAt`]   = Date.now();
+        updates[`/bets/${matchedBet.id}/settledWeek`] = currentWeek;
         matched++;
     }
 
