@@ -913,7 +913,8 @@
                 <div class="form-group">
                     <label>Status</label>
                     <select id="retroStatus" onchange="updateRetroSettledWeekVisibility()">
-                        <option value="placed">Placed (awaiting result)</option>
+                        <option value="pending">🟡 Pending (not yet placed)</option>
+                        <option value="placed" selected>🔵 Placed (awaiting result)</option>
                         <option value="won">Won ✅</option>
                         <option value="ew-place">📍 Placed only (EW — place payout, win lost)</option>
                         <option value="lost">Lost ❌</option>
@@ -928,7 +929,7 @@
                 <label>Returns (€ total back incl. stake) — if won</label>
                 <input type="number" id="retroReturns" placeholder="e.g. 17.50" step="0.01" min="0">
             </div>
-            <div class="form-row form-row-2" id="retroSettledWeekGroup">
+            <div class="form-row form-row-2 hidden" id="retroSettledWeekGroup">
                 <div class="form-group">
                     <label>Settled in week</label>
                     <input type="number" id="retroSettledWeek" min="1" placeholder="e.g. 3">
@@ -3047,19 +3048,20 @@ async function addRetroBet() {
         savedStatus = 'lost';
     } else {
         profit = null;
-        savedStatus = status; // 'placed'
+        savedStatus = status; // 'pending' or 'placed'
     }
 
     const isSettled = savedStatus === 'won' || savedStatus === 'lost';
     const settledWeek = isSettled ? (settledWeekRaw || week) : undefined;
 
-    // For current-week bets: deduct token + PP stake just like a normal submission/placement
+    // For current-week bets: deduct token + PP stake just like a real submission
     const tokensDeducted = isCurrentWeek && !isFbType ? Math.ceil(totalStake / BET_VALUE) : 0;
 
     const bet = {
         id: betId, user: member, selection, stake, type, status: savedStatus, week,
-        submittedAt: Date.now(), placedBy: currentUser, placedAt: Date.now(),
-        oddsPlaced: odds, profit, tokensDeducted,
+        submittedAt: Date.now(), tokensDeducted, profit,
+        // Only add placedBy/placedAt if already placed — pending bets haven't been placed yet
+        ...(savedStatus !== 'pending' ? { placedBy: currentUser, placedAt: Date.now(), oddsPlaced: odds } : {}),
         ...(isSettled ? { settledAt: Date.now(), settledWeek } : {}),
         ...(savedStatus === 'won' ? { returns } : {})
     };
