@@ -905,7 +905,7 @@
             <div class="form-row form-row-2">
                 <div class="form-group">
                     <label>Status</label>
-                    <select id="retroStatus">
+                    <select id="retroStatus" onchange="updateRetroSettledWeekVisibility()">
                         <option value="placed">Placed (awaiting result)</option>
                         <option value="won">Won ✅</option>
                         <option value="ew-place">📍 Placed only (EW — place payout, win lost)</option>
@@ -920,6 +920,13 @@
             <div class="form-group" id="retroReturnsGroup">
                 <label>Returns (€ total back incl. stake) — if won</label>
                 <input type="number" id="retroReturns" placeholder="e.g. 17.50" step="0.01" min="0">
+            </div>
+            <div class="form-row form-row-2" id="retroSettledWeekGroup">
+                <div class="form-group">
+                    <label>Settled in week</label>
+                    <input type="number" id="retroSettledWeek" min="1" placeholder="e.g. 3">
+                    <p style="font-size:0.78em;color:var(--text-light);margin-top:3px">Which week's leaderboard this result counts toward. Defaults to the submission week above.</p>
+                </div>
             </div>
             <button class="btn btn-gold" onclick="addRetroBet()">➕ Add Bet</button>
             <div id="retroMsg" style="margin-top:10px"></div>
@@ -1513,7 +1520,8 @@ function getWeekTopTipster(week) {
         const pnl = getWeeklyPnl(m, week);
         if (pnl > bestPnl) { bestPnl = pnl; best = m; }
     });
-    return best;
+    // Only return a winner if someone actually had positive or negative activity
+    return bestPnl === 0 ? null : best;
 }
 
 function getCurrentFreeBetHolder() {
@@ -2669,10 +2677,12 @@ async function deleteBet(betId) {
         const isEwD          = b.type === 'ew';
         const totalStakeD    = isEwD ? b.stake * 2 : b.stake;
         const tokensDeducted = b.tokensDeducted != null ? b.tokensDeducted : (Math.ceil(totalStakeD / BET_VALUE) || 1);
+        const ppUpdates      = calcSettlePpUpdates(b, 'void', 0, totalStakeD);
+        const writes = { ...ppUpdates };
         if (tokensDeducted > 0) {
-            const newBalance = Math.min(MAX_CARRY, balance + tokensDeducted);
-            await db.ref('/users/' + b.user + '/betBalance').set(newBalance);
+            writes[`/users/${b.user}/betBalance`] = Math.min(MAX_CARRY, balance + tokensDeducted);
         }
+        if (Object.keys(writes).length) await db.ref('/').update(writes);
     }
 
     await db.ref('/bets/' + betId).remove();
@@ -2713,7 +2723,8 @@ function renderAdmin() {
     if (retroSel && !retroSel.dataset.populated) {
         ALL_USERS.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; retroSel.appendChild(o); });
         retroSel.dataset.populated = '1';
-        document.getElementById('retroWeek').value = currentWeek;  // only set default once
+        document.getElementById('retroWeek').value = currentWeek;
+        document.getElementById('retroSettledWeek').value = currentWeek;  // only set default once
     }
 
     // Populate editPnl member select (includes Group) — only on first render
@@ -2900,10 +2911,14 @@ async function advanceWeek() {
         const balance = getUserBalance(m);
         let newBalance = Math.min(MAX_CARRY, balance + bpw);
 
-        // Activity rule: if no non-void bets in last ACTIVITY_WEEKS, forfeit 1 bet
+        // Activity rule: if no non-void bets submitted OR active in last ACTIVITY_WEEKS, forfeit 1 bet
         let hasBet = false;
         for (let w = currentWeek - ACTIVITY_WEEKS + 1; w <= currentWeek; w++) {
             if (getUserBets(m, w).some(b => b.status !== 'void')) { hasBet = true; break; }
+        }
+        // Also count bets still placed/pending from earlier weeks — member is still active
+        if (!hasBet && Object.values(appData.bets).some(b => b.user === m && (b.status === 'placed' || b.status === 'pending'))) {
+            hasBet = true;
         }
         if (!hasBet && newBalance > 0) newBalance -= 1;
 
@@ -2929,16 +2944,23 @@ async function saveFreeBetOverride() {
     await db.ref('/config/freeBetOverride').set(val || null);
 }
 
+function updateRetroSettledWeekVisibility() {
+    const status = document.getElementById('retroStatus')?.value;
+    const isSettled = status === 'won' || status === 'lost' || status === 'ew-place';
+    document.getElementById('retroSettledWeekGroup')?.classList.toggle('hidden', !isSettled);
+}
+
 async function addRetroBet() {
-    const member    = document.getElementById('retroMember').value;
-    const week      = parseInt(document.getElementById('retroWeek').value);
-    const selection = document.getElementById('retroSelection').value.trim();
-    const stake     = parseFloat(document.getElementById('retroStake').value);
-    const type      = document.getElementById('retroType').value;
-    const status    = document.getElementById('retroStatus').value;
-    const odds      = document.getElementById('retroOdds').value.trim();
-    const returns   = parseFloat(document.getElementById('retroReturns').value) || 0;
-    const msg       = document.getElementById('retroMsg');
+    const member       = document.getElementById('retroMember').value;
+    const week         = parseInt(document.getElementById('retroWeek').value);
+    const selection    = document.getElementById('retroSelection').value.trim();
+    const stake        = parseFloat(document.getElementById('retroStake').value);
+    const type         = document.getElementById('retroType').value;
+    const status       = document.getElementById('retroStatus').value;
+    const odds         = document.getElementById('retroOdds').value.trim();
+    const returns      = parseFloat(document.getElementById('retroReturns').value) || 0;
+    const settledWeekRaw = parseInt(document.getElementById('retroSettledWeek').value);
+    const msg          = document.getElementById('retroMsg');
 
     if (!selection) { msg.innerHTML = '<div class="alert alert-error">Please enter a selection.</div>'; return; }
     if (!week)      { msg.innerHTML = '<div class="alert alert-error">Please enter a week number.</div>'; return; }
@@ -2961,18 +2983,22 @@ async function addRetroBet() {
         savedStatus = status; // 'placed'
     }
 
+    // Use the explicit settled week if provided, otherwise fall back to submission week
+    const isSettled = savedStatus === 'won' || savedStatus === 'lost';
+    const settledWeek = isSettled ? (settledWeekRaw || week) : undefined;
+
     const bet = {
         id: betId, user: member, selection, stake, type, status: savedStatus, week,
         submittedAt: Date.now(), placedBy: currentUser, placedAt: Date.now(),
         oddsPlaced: odds, profit,
+        ...(isSettled ? { settledAt: Date.now(), settledWeek } : {}),
         ...(savedStatus === 'won' ? { returns } : {})
     };
 
     const updates = { [`/bets/${betId}`]: bet };
 
-    // Update P&L if settled (retro bets are historical — PP balance is NOT adjusted
-    // because the historical activity is already baked into the seeded PP balance)
-    if (savedStatus === 'won' || savedStatus === 'lost') {
+    // Update P&L if settled
+    if (isSettled) {
         const newPnl = getAllTimePnl(member) + (profit || 0);
         updates[`/users/${member}/totalPnl`] = Math.round(newPnl * 100) / 100;
         if (savedStatus === 'won') {
@@ -2986,7 +3012,8 @@ async function addRetroBet() {
     document.getElementById('retroSelection').value = '';
     document.getElementById('retroOdds').value = '';
     document.getElementById('retroReturns').value = '';
-    msg.innerHTML = `<div class="alert alert-success">Bet added for ${member} — Week ${week}.</div>`;
+    document.getElementById('retroSettledWeek').value = currentWeek;
+    msg.innerHTML = `<div class="alert alert-success">Bet added for ${member} — Week ${week}${settledWeek && settledWeek !== week ? `, settled Week ${settledWeek}` : ''}.</div>`;
     setTimeout(() => msg.innerHTML = '', 4000);
 }
 
