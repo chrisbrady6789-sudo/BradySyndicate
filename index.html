@@ -801,6 +801,12 @@
         <h2>📅 Weekly Winners</h2>
         <div id="weeklyWinners"></div>
     </div>
+
+    <div class="card">
+        <h2>🏃 Activity Tracker</h2>
+        <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:14px">Must place at least 1 bet every <strong>${ACTIVITY_WEEKS}</strong> weeks or lose a token.</p>
+        <div id="activityTracker"></div>
+    </div>
 </div>
 
 <!-- ══════════════════════════════════════
@@ -2040,10 +2046,11 @@ function buildLbRow(r, i, isWeek, freeBetHolder) {
     const badgeClass = badgeMap[pos] || 'pos-n';
     const isMe  = r.m === currentUser;
     const crown = r.m === freeBetHolder ? ' <span class="crown" title="Free bet holder">🎁</span>' : '';
+    const actWarn = r.inactive ? ' <span title="Inactive — no bet in last ' + ACTIVITY_WEEKS + ' weeks" style="color:#ef4444;font-size:0.85em">⚠️</span>' : '';
     const weekCols = isWeek ? `<td>${r.placed}</td><td>${r.won}</td><td>${r.sr}%</td>` : '';
     return `<tr class="${isMe ? 'me' : ''} ${pos === 1 ? 'top' : ''}">
         <td><span class="pos-badge ${badgeClass}">${pos}</span></td>
-        <td><strong>${esc(r.m)}</strong>${crown}</td>
+        <td><strong>${esc(r.m)}</strong>${crown}${actWarn}</td>
         <td class="${r.pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${fmtEuro(r.pnl)}</td>
         ${weekCols}
         <td>${r.balance}</td>
@@ -2066,7 +2073,8 @@ function buildLbMemberRow(m, isWeek) {
         : getUserBets(m, null).filter(b => b.status === 'won' || b.status === 'lost');
     const won   = bets.filter(b => b.status === 'won').length;
     const sr    = bets.length ? Math.round((won / bets.length) * 100) : 0;
-    return { m, pnl, placed: bets.length, won, sr, balance: getUserBalance(m) };
+    const inactive = !getMemberActivityStatus(m).ok;
+    return { m, pnl, placed: bets.length, won, sr, balance: getUserBalance(m), inactive };
 }
 
 function buildWeeklyWinnerRow(w) {
@@ -2209,6 +2217,30 @@ function renderLeaderboard() {
         document.getElementById('weeklyWinners').innerHTML = '<p style="color:var(--text-light)">No completed weeks yet.</p>';
     } else {
         document.getElementById('weeklyWinners').innerHTML = prevWeeks.map(buildWeeklyWinnerRow).join('');
+    }
+
+    // Activity tracker
+    const actEl = document.getElementById('activityTracker');
+    if (actEl) {
+        const actRows = MEMBERS.map(m => {
+            const act = getMemberActivityStatus(m);
+            const chip = act.ok
+                ? `<span style="background:#dcfce7;border:1px solid #86efac;color:#15803d;border-radius:20px;padding:2px 9px;font-size:0.75em;font-weight:700;white-space:nowrap">✅ Active</span>`
+                : `<span style="background:#fff1f0;border:1px solid #fca5a5;color:#b91c1c;border-radius:20px;padding:2px 9px;font-size:0.75em;font-weight:700;white-space:nowrap">⚠️ At risk</span>`;
+            const detail = act.ok
+                ? (act.lastBetWeek != null ? `Bet in Week ${act.lastBetWeek}` : 'Has active bet')
+                : (act.lastBetWeek ? `Last bet: Week ${act.lastBetWeek} (${act.weeksIdle}w ago)` : 'No bets found');
+            const isMe = m === currentUser;
+            return `<tr${isMe ? ' style="background:rgba(255,215,0,0.06);font-weight:600"' : ''}>
+                <td><strong>${esc(m)}</strong></td>
+                <td>${chip}</td>
+                <td style="font-size:0.82em;color:var(--text-light)">${esc(detail)}</td>
+            </tr>`;
+        }).join('');
+        actEl.innerHTML = `<table class="history-table">
+            <thead><tr><th>Member</th><th>Status</th><th>Detail</th></tr></thead>
+            <tbody>${actRows}</tbody>
+        </table>`;
     }
 }
 
@@ -2992,25 +3024,13 @@ async function savePin() {
 
 async function advanceWeek() {
     const bpw = appData.config?.betsPerWeek || BETS_PER_WEEK;
-    if (!confirm(`Advance to Week ${currentWeek + 1}? This will:\n- Add ${bpw} bets to everyone's balance (max ${MAX_CARRY})\n- Apply activity rule (forfeit 1 bet if no bet in last ${ACTIVITY_WEEKS} weeks)`)) return;
+    if (!confirm(`Advance to Week ${currentWeek + 1}? This will add ${bpw} bets to everyone's balance (max ${MAX_CARRY}).`)) return;
 
     const updates = { 'currentWeek': currentWeek + 1 };
 
     for (const m of MEMBERS) {   // Group doesn't receive weekly bet allocations
         const balance = getUserBalance(m);
-        let newBalance = Math.min(MAX_CARRY, balance + bpw);
-
-        // Activity rule: if no non-void bets submitted OR active in last ACTIVITY_WEEKS, forfeit 1 bet
-        let hasBet = false;
-        for (let w = currentWeek - ACTIVITY_WEEKS + 1; w <= currentWeek; w++) {
-            if (getUserBets(m, w).some(b => b.status !== 'void')) { hasBet = true; break; }
-        }
-        // Also count bets still placed/pending from earlier weeks — member is still active
-        if (!hasBet && Object.values(appData.bets).some(b => b.user === m && (b.status === 'placed' || b.status === 'pending'))) {
-            hasBet = true;
-        }
-        if (!hasBet && newBalance > 0) newBalance -= 1;
-
+        const newBalance = Math.min(MAX_CARRY, balance + bpw);
         updates['/users/' + m + '/betBalance'] = newBalance;
     }
 
