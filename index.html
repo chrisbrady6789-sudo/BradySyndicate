@@ -2802,9 +2802,33 @@ function renderAdmin() {
     if (adminTab === 'config') { renderAdminConfig(); renderAdminFreeBets(); renderFeatureToggles(); }
 }
 
+function getMemberActivityStatus(m) {
+    // Returns { ok, lastBetWeek, weeksIdle }
+    // Check ACTIVITY_WEEKS rolling window ending at currentWeek
+    for (let w = currentWeek; w >= Math.max(1, currentWeek - ACTIVITY_WEEKS + 1); w--) {
+        if (getUserBets(m, w).some(b => b.status !== 'void')) {
+            return { ok: true, lastBetWeek: w, weeksIdle: currentWeek - w };
+        }
+    }
+    // Also count active (placed/pending) bets from any week as "still active"
+    const hasActive = Object.values(appData.bets).some(b => b.user === m && (b.status === 'placed' || b.status === 'pending'));
+    if (hasActive) return { ok: true, lastBetWeek: null, weeksIdle: 0 };
+    // Find when they last bet at all
+    const allBets = Object.values(appData.bets).filter(b => b.user === m && b.status !== 'void');
+    const lastWeek = allBets.length ? Math.max(...allBets.map(b => b.week)) : 0;
+    return { ok: false, lastBetWeek: lastWeek || null, weeksIdle: lastWeek ? currentWeek - lastWeek : currentWeek };
+}
+
 function renderAdminUsers() {
     const rows = MEMBERS.map(m => {   // Group managed separately via PP balance, not here
         const balance = getUserBalance(m);
+        const act = getMemberActivityStatus(m);
+        const actChip = act.ok
+            ? `<span style="background:#dcfce7;border:1px solid #86efac;color:#15803d;border-radius:20px;padding:2px 8px;font-size:0.75em;font-weight:700">✅ Active</span>`
+            : `<span style="background:#fff1f0;border:1px solid #fca5a5;color:#b91c1c;border-radius:20px;padding:2px 8px;font-size:0.75em;font-weight:700">⚠️ Inactive</span>`;
+        const lastNote = act.lastBetWeek
+            ? `<span style="font-size:0.75em;color:var(--text-light);display:block;margin-top:2px">Last bet: Week ${act.lastBetWeek}</span>`
+            : `<span style="font-size:0.75em;color:var(--text-light);display:block;margin-top:2px">No bets found</span>`;
         return `<tr>
             <td><strong>${esc(m)}</strong></td>
             <td class="${getAllTimePnl(m) >= 0 ? 'pnl-pos':'pnl-neg'}">${fmtEuro(getAllTimePnl(m))}</td>
@@ -2819,12 +2843,13 @@ function renderAdminUsers() {
                     <button class="btn btn-sm" style="background:var(--navy-mid);color:#fff" onclick="setBalance('${m}')">Set</button>
                 </div>
             </td>
+            <td>${actChip}${lastNote}</td>
             <td><button class="btn btn-sm" style="background:var(--amber);color:#fff" onclick="resetPin('${m}')">Reset PIN</button></td>
         </tr>`;
     }).join('');
     document.getElementById('adminUsersTable').innerHTML = `
         <table class="history-table">
-            <thead><tr><th>Name</th><th>P&L</th><th>Bets</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>P&L</th><th>Bets</th><th>Activity (last ${ACTIVITY_WEEKS}w)</th><th></th></tr></thead>
             <tbody>${rows}</tbody>
         </table>`;
 }
