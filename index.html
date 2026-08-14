@@ -837,8 +837,20 @@
                     <p style="font-size:0.78em;color:var(--text-light);margin-top:3px">Which week's leaderboard this result counts toward. Defaults to the submission week above.</p>
                 </div>
             </div>
-            <button class="btn btn-gold" onclick="addWhatsAppBet()">➕ Add WhatsApp Bet</button>
+            <button class="btn btn-gold" id="waSaveBtn" onclick="addWhatsAppBet()">➕ Add WhatsApp Bet</button>
             <div id="waMsg" style="margin-top:10px"></div>
+
+            <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
+            <div style="font-size:0.85em;font-weight:600;color:var(--text-mid);margin-bottom:6px">⚖️ At Risk Adjustment</div>
+            <p style="font-size:0.82em;color:var(--text-light);margin-bottom:10px">Offset the "At Risk" stat on the dashboard — use if a bet was never placed or was corrected outside the app.</p>
+            <div style="display:flex;gap:8px;align-items:flex-end">
+                <div class="form-group" style="flex:1;margin-bottom:0">
+                    <label for="atRiskAdj">Offset (±€)</label>
+                    <input type="number" id="atRiskAdj" step="0.01" placeholder="e.g. -5.00 to subtract €5">
+                </div>
+                <button class="btn btn-sm" style="margin-bottom:1px" onclick="saveAtRiskAdj()">Set</button>
+            </div>
+            <div id="atRiskAdjMsg" style="margin-top:6px;font-size:0.85em"></div>
         </div>
     </div>
 </div>
@@ -1724,6 +1736,8 @@ function renderDashboard() {
     const atRiskVal = allActiveBets
         .filter(b => b.status === 'placed')
         .reduce((s, b) => s + (Number.parseFloat(b.stake) || BET_VALUE) * (b.type === 'ew' ? 2 : 1), 0);
+    const atRiskAdj  = Number.parseFloat(appData.config?.atRiskAdj) || 0;
+    const atRiskDisp = Math.max(0, atRiskVal + atRiskAdj);
     const pendingVal = allActiveBets
         .filter(b => b.status === 'pending')
         .reduce((s, b) => s + (Number.parseFloat(b.stake) || BET_VALUE), 0);
@@ -1748,7 +1762,7 @@ function renderDashboard() {
             <div class="dash-stat-val gold">€${(balance * BET_VALUE).toFixed(2)}</div>
             <div class="dash-stat-label">Stake Value</div>
         </div>
-        ${feats.atRisk === false || (pendingVal === 0 && atRiskVal === 0) ? '' : buildAtRiskStat(atRiskVal, pendingVal)}
+        ${feats.atRisk === false || (pendingVal === 0 && atRiskDisp === 0) ? '' : buildAtRiskStat(atRiskDisp, pendingVal)}
         ${feats.ppBalance === false ? '' : `
         <div class="dash-stat">
             <div class="dash-stat-val" style="font-size:1.4em;color:#1a6b3a">€${ppBalance.toFixed(2)}</div>
@@ -2968,9 +2982,10 @@ function renderAdminUsers() {
         const actChip = act.ok
             ? `<span style="background:#dcfce7;border:1px solid #86efac;color:#15803d;border-radius:20px;padding:2px 8px;font-size:0.75em;font-weight:700">✅ Active</span>`
             : `<span style="background:#fff1f0;border:1px solid #fca5a5;color:#b91c1c;border-radius:20px;padding:2px 8px;font-size:0.75em;font-weight:700">⚠️ Inactive</span>`;
-        const lastNote = act.lastBetWeek
-            ? `<span style="font-size:0.75em;color:var(--text-light);display:block;margin-top:2px">Last bet: Week ${act.lastBetWeek}</span>`
-            : `<span style="font-size:0.75em;color:var(--text-light);display:block;margin-top:2px">No bets found</span>`;
+        let lastNoteText = 'No bets found';
+        if (act.ok && !act.lastBetWeek) lastNoteText = 'Has active bet';
+        else if (act.lastBetWeek)       lastNoteText = `Last bet: Week ${act.lastBetWeek}`;
+        const lastNote = `<span style="font-size:0.75em;color:var(--text-light);display:block;margin-top:2px">${lastNoteText}</span>`;
         return `<tr>
             <td><strong>${esc(m)}</strong></td>
             <td class="${getAllTimePnl(m) >= 0 ? 'pnl-pos':'pnl-neg'}">${fmtEuro(getAllTimePnl(m))}</td>
@@ -3737,6 +3752,8 @@ function initWaTab() {
         document.getElementById('waSettledWeek').value = currentWeek;
         updateWaRetroModeNote();
     }
+    const adjEl = document.getElementById('atRiskAdj');
+    if (adjEl) adjEl.value = appData.config?.atRiskAdj ?? '';
 }
 
 function setWaInputMode(mode) {
@@ -3782,6 +3799,7 @@ function updateWaSettledWeekVisibility() {
 }
 
 async function addWhatsAppBet() {
+    const btn = document.getElementById('waSaveBtn');
     const msg = document.getElementById('waMsg');
     msg.innerHTML = '';
 
@@ -3809,13 +3827,14 @@ async function addWhatsAppBet() {
     if (!week)                                       { msg.innerHTML = '<div class="alert alert-error">Please enter a week number.</div>'; return; }
     if (!stake || Number.isNaN(stake) || stake <= 0) { msg.innerHTML = '<div class="alert alert-error">Please enter a valid stake.</div>'; return; }
 
+    btn.disabled = true;
     msg.innerHTML = '<div class="alert" style="background:var(--card-bg2);color:var(--text-mid)">Saving…</div>';
 
-    let screenshotUrl      = null;
-    let screenshotPublicId = null;
+    try {
+        let screenshotUrl      = null;
+        let screenshotPublicId = null;
 
-    if (screenshotFile) {
-        try {
+        if (screenshotFile) {
             const formData = new FormData();
             formData.append('file', screenshotFile);
             formData.append('upload_preset', CLOUDINARY_PRESET);
@@ -3828,94 +3847,106 @@ async function addWhatsAppBet() {
             const data = await res.json();
             screenshotUrl      = data.secure_url;
             screenshotPublicId = data.public_id;
-        } catch (e) {
-            msg.innerHTML = `<div class="alert alert-error">Screenshot upload failed: ${e.message}</div>`;
-            return;
         }
-    }
 
-    const isCurrentWeek = week === currentWeek;
-    const betId         = db.ref('/bets').push().key;
-    const totalStake    = type === 'ew' ? stake * 2 : stake;
-    const isFbType      = type === 'freeBet';
+        const isCurrentWeek = week === currentWeek;
+        const betId         = db.ref('/bets').push().key;
+        const totalStake    = type === 'ew' ? stake * 2 : stake;
+        const isFbType      = type === 'freeBet';
 
-    let profit, savedStatus;
-    if (status === 'won') {
-        profit      = isFbType ? returns : returns - totalStake;
-        savedStatus = 'won';
-    } else if (status === 'ew-place') {
-        profit      = returns - totalStake;
-        savedStatus = profit >= 0 ? 'won' : 'lost';
-    } else if (status === 'lost') {
-        profit      = isFbType ? 0 : -totalStake;
-        savedStatus = 'lost';
-    } else {
-        profit      = null;
-        savedStatus = status;
-    }
-
-    const isSettled       = savedStatus === 'won' || savedStatus === 'lost';
-    const settledWeek     = isSettled ? (settledWeekRaw || week) : undefined;
-    const tokensDeducted  = isCurrentWeek && !isFbType ? Math.ceil(totalStake / BET_VALUE) : 0;
-
-    const bet = {
-        id: betId, user: member, selection, stake, type, status: savedStatus, week,
-        submittedAt: Date.now(), tokensDeducted, profit,
-        ...(savedStatus !== 'pending' ? { placedBy: currentUser, placedAt: Date.now(), oddsPlaced: odds } : {}),
-        ...(isSettled ? { settledAt: Date.now(), settledWeek } : {}),
-        ...(savedStatus === 'won' ? { returns } : {}),
-        ...(screenshotUrl ? { screenshotUrl, screenshotPublicId, hasScreenshot: true } : {})
-    };
-
-    const updates = { [`/bets/${betId}`]: bet };
-
-    if (isCurrentWeek) {
-        if (!isFbType && tokensDeducted > 0) {
-            updates[`/users/${member}/betBalance`] = Math.max(0, getUserBalance(member) - tokensDeducted);
+        let profit, savedStatus;
+        if (status === 'won') {
+            profit      = isFbType ? returns : returns - totalStake;
+            savedStatus = 'won';
+        } else if (status === 'ew-place') {
+            profit      = returns - totalStake;
+            savedStatus = profit >= 0 ? 'won' : 'lost';
+        } else if (status === 'lost') {
+            profit      = isFbType ? 0 : -totalStake;
+            savedStatus = 'lost';
+        } else {
+            profit      = null;
+            savedStatus = status;
         }
-        if (!isFbType) {
-            const ppBalance = appData.config.ppBalance ?? PP_BALANCE_SEED;
-            updates['/config/ppBalance'] = Math.max(0, Math.round((ppBalance - totalStake) * 100) / 100);
-        }
-        if (isSettled) {
+
+        const isSettled      = savedStatus === 'won' || savedStatus === 'lost';
+        const settledWeek    = isSettled ? (settledWeekRaw || week) : undefined;
+        const tokensDeducted = isCurrentWeek && !isFbType ? Math.ceil(totalStake / BET_VALUE) : 0;
+
+        const bet = {
+            id: betId, user: member, selection, stake, type, status: savedStatus, week,
+            submittedAt: Date.now(), tokensDeducted, profit,
+            ...(savedStatus !== 'pending' ? { placedBy: currentUser, placedAt: Date.now(), oddsPlaced: odds } : {}),
+            ...(isSettled ? { settledAt: Date.now(), settledWeek } : {}),
+            ...(savedStatus === 'won' ? { returns } : {}),
+            ...(screenshotUrl ? { screenshotUrl, screenshotPublicId, hasScreenshot: true } : {})
+        };
+
+        const updates = { [`/bets/${betId}`]: bet };
+
+        if (isCurrentWeek) {
+            if (!isFbType && tokensDeducted > 0) {
+                updates[`/users/${member}/betBalance`] = Math.max(0, getUserBalance(member) - tokensDeducted);
+            }
+            if (!isFbType) {
+                const ppBalance = appData.config.ppBalance ?? PP_BALANCE_SEED;
+                updates['/config/ppBalance'] = Math.max(0, Math.round((ppBalance - totalStake) * 100) / 100);
+            }
+            if (isSettled) {
+                updates[`/users/${member}/totalPnl`] = Math.round((getAllTimePnl(member) + (profit || 0)) * 100) / 100;
+                if (savedStatus === 'won') {
+                    updates[`/users/${member}/betsWon`] = (appData.users[member]?.betsWon || 0) + 1;
+                    const bonus = isBigOdds(odds) ? 1 : 0;
+                    const curBal = updates[`/users/${member}/betBalance`] ?? getUserBalance(member);
+                    updates[`/users/${member}/betBalance`] = Math.min(MAX_CARRY, curBal + tokensDeducted + bonus);
+                    if (!isFbType && returns > 0) {
+                        const ppNow = updates['/config/ppBalance'] ?? (appData.config.ppBalance ?? PP_BALANCE_SEED);
+                        updates['/config/ppBalance'] = Math.round((ppNow + returns) * 100) / 100;
+                    }
+                }
+            }
+        } else if (isSettled) {
             updates[`/users/${member}/totalPnl`] = Math.round((getAllTimePnl(member) + (profit || 0)) * 100) / 100;
             if (savedStatus === 'won') {
                 updates[`/users/${member}/betsWon`] = (appData.users[member]?.betsWon || 0) + 1;
-                const bonus = isBigOdds(odds) ? 1 : 0;
-                const curBal = updates[`/users/${member}/betBalance`] ?? getUserBalance(member);
-                updates[`/users/${member}/betBalance`] = Math.min(MAX_CARRY, curBal + tokensDeducted + bonus);
-                if (!isFbType && returns > 0) {
-                    const ppNow = updates['/config/ppBalance'] ?? (appData.config.ppBalance ?? PP_BALANCE_SEED);
-                    updates['/config/ppBalance'] = Math.round((ppNow + returns) * 100) / 100;
-                }
             }
         }
-        updates[`/users/${member}/lastBetWeek`] = currentWeek;
-    } else if (isSettled) {
-        updates[`/users/${member}/totalPnl`] = Math.round((getAllTimePnl(member) + (profit || 0)) * 100) / 100;
-        if (savedStatus === 'won') {
-            updates[`/users/${member}/betsWon`] = (appData.users[member]?.betsWon || 0) + 1;
-        }
+
+        // Always record lastBetWeek if this bet's week is more recent than stored
+        const existingLastBet = appData.users[member]?.lastBetWeek || 0;
+        if (week > existingLastBet) updates[`/users/${member}/lastBetWeek`] = week;
+
+        await db.ref('/').update(updates);
+
+        // Clear form
+        document.getElementById('waSelection').value        = '';
+        document.getElementById('waDescriptionPhoto').value = '';
+        document.getElementById('waScreenshot').value       = '';
+        document.getElementById('waPreview').style.display  = 'none';
+        document.getElementById('waDropText').style.display = '';
+        document.getElementById('waOdds').value             = '';
+        document.getElementById('waReturns').value          = '';
+        document.getElementById('waSettledWeek').value      = currentWeek;
+        setWaInputMode('text');
+
+        const modeLabel = isCurrentWeek ? ' (current week — balance deducted)' : ' (historical — no balance change)';
+        const weekNote  = settledWeek && settledWeek !== week ? `, settled Week ${settledWeek}` : '';
+        const ssNote    = screenshotUrl ? ' · 📸 screenshot attached' : '';
+        msg.innerHTML = `<div class="alert alert-success">WhatsApp bet added for ${esc(member)} — Week ${week}${weekNote}${modeLabel}${ssNote}.</div>`;
+        setTimeout(() => msg.innerHTML = '', 5000);
+    } catch (e) {
+        msg.innerHTML = `<div class="alert alert-error">Failed to save: ${e.message}</div>`;
+    } finally {
+        btn.disabled = false;
     }
+}
 
-    await db.ref('/').update(updates);
-
-    // Clear form
-    document.getElementById('waSelection').value        = '';
-    document.getElementById('waDescriptionPhoto').value = '';
-    document.getElementById('waScreenshot').value       = '';
-    document.getElementById('waPreview').style.display  = 'none';
-    document.getElementById('waDropText').style.display = '';
-    document.getElementById('waOdds').value             = '';
-    document.getElementById('waReturns').value          = '';
-    document.getElementById('waSettledWeek').value      = currentWeek;
-    setWaInputMode('text');
-
-    const modeLabel = isCurrentWeek ? ' (current week — balance deducted)' : ' (historical — no balance change)';
-    const weekNote  = settledWeek && settledWeek !== week ? `, settled Week ${settledWeek}` : '';
-    const ssNote    = screenshotUrl ? ' · 📸 screenshot attached' : '';
-    msg.innerHTML = `<div class="alert alert-success">WhatsApp bet added for ${esc(member)} — Week ${week}${weekNote}${modeLabel}${ssNote}.</div>`;
-    setTimeout(() => msg.innerHTML = '', 5000);
+async function saveAtRiskAdj() {
+    const val = Number.parseFloat(document.getElementById('atRiskAdj').value);
+    await db.ref('/config/atRiskAdj').set(Number.isNaN(val) ? null : val || null);
+    const el = document.getElementById('atRiskAdjMsg');
+    el.innerHTML = '<span style="color:var(--green)">Saved.</span>';
+    setTimeout(() => { el.innerHTML = ''; }, 3000);
 }
 
 // ══════════════════════════════════════════════════════════════
