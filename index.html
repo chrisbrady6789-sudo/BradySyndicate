@@ -686,7 +686,7 @@
      SUBMIT BET
 ══════════════════════════════════════ -->
 <div id="submitPage" class="container hidden">
-    <div class="card">
+    <div id="submitRegularForm" class="card">
         <h2>➕ Submit a Bet Request</h2>
         <div id="submitMsg"></div>
 
@@ -738,10 +738,110 @@
             </label>
         </div>
     </div>
-</div>
 
-<!-- ══════════════════════════════════════
-     FEED
+    <!-- Admin: WhatsApp Bets form (shown instead of the regular form) -->
+    <div id="submitAdminForm" class="hidden">
+        <div class="card">
+            <h2>📱 Add WhatsApp Bet</h2>
+            <p style="font-size:0.85em;color:var(--text-mid);margin-bottom:10px">Enter a bet that was placed via WhatsApp. Behaviour depends on the week chosen.</p>
+            <div class="alert alert-info" id="waCurrentWeekNote" style="font-size:0.82em;display:none">
+                ⚡ <strong>Current week</strong> — deducts a token from the member's balance and deducts the stake from the PP balance.
+            </div>
+            <div class="alert" id="waPastWeekNote" style="font-size:0.82em;background:var(--card-bg2);border:1.5px solid var(--border);color:var(--text-mid);display:none">
+                📅 <strong>Past week</strong> — historical entry: no token deducted, PP balance not adjusted.
+            </div>
+
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+                <button class="btn btn-sm" id="waToggleText" onclick="setWaInputMode('text')" style="background:var(--navy-mid);color:#fff">✏️ Type selection</button>
+                <button class="btn btn-sm btn-ghost" id="waTogglePhoto" onclick="setWaInputMode('photo')">📷 Upload screenshot</button>
+            </div>
+
+            <div id="waModeText">
+                <div class="form-group">
+                    <label>Selection / Description</label>
+                    <textarea id="waSelection" rows="3" placeholder="e.g. Man City to win, 4-fold acca, 2.50 e/w Cheltenham 3:30..."></textarea>
+                </div>
+            </div>
+
+            <div id="waModePhoto" class="hidden">
+                <div class="form-group">
+                    <label>Screenshot from WhatsApp</label>
+                    <div id="waDropZone" onclick="document.getElementById('waScreenshot').click()"
+                        style="border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;cursor:pointer;background:var(--card-bg2);transition:border-color 0.2s">
+                        <div id="waPreview" style="display:none;margin-bottom:10px">
+                            <img id="waPreviewImg" style="max-width:100%;max-height:250px;border-radius:8px;object-fit:contain" alt="Screenshot preview">
+                        </div>
+                        <div id="waDropText">
+                            <div style="font-size:2em;margin-bottom:8px">📷</div>
+                            <div style="font-weight:600;color:var(--text-mid)">Tap to attach screenshot</div>
+                            <div style="font-size:0.8em;color:var(--text-light);margin-top:4px">JPG, PNG or screenshot from camera roll</div>
+                        </div>
+                    </div>
+                    <input type="file" id="waScreenshot" accept="image/*" style="display:none" onchange="onWaScreenshotSelected(event)">
+                </div>
+                <div class="form-group">
+                    <label>Selection / Description</label>
+                    <input type="text" id="waDescriptionPhoto" placeholder="e.g. 4-fold acca, each way, Cheltenham tips...">
+                </div>
+            </div>
+
+            <div class="form-row form-row-2">
+                <div class="form-group">
+                    <label>Member</label>
+                    <select id="waMember"></select>
+                </div>
+                <div class="form-group">
+                    <label>Week</label>
+                    <input type="number" id="waWeek" min="1" placeholder="e.g. 26" onchange="updateWaRetroModeNote()">
+                </div>
+            </div>
+            <div class="form-row form-row-2">
+                <div class="form-group">
+                    <label>Stake per line (€)</label>
+                    <input type="number" id="waStake" step="0.50" min="0.50" placeholder="e.g. 2.50, 5, 10">
+                    <p style="font-size:0.78em;color:var(--text-light);margin-top:3px">For e/w enter the per-line stake (e.g. 2.50 e/w = €5 total)</p>
+                </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="waType">
+                        <option value="single">Single</option>
+                        <option value="ew">Each Way</option>
+                        <option value="freeBet">Free Bet</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row form-row-2">
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="waStatus" onchange="updateWaSettledWeekVisibility()">
+                        <option value="pending">🟡 Pending (not yet placed)</option>
+                        <option value="placed" selected>🔵 Placed (awaiting result)</option>
+                        <option value="won">Won ✅</option>
+                        <option value="ew-place">📍 Placed only (EW — place payout, win lost)</option>
+                        <option value="lost">Lost ❌</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Odds</label>
+                    <input type="text" id="waOdds" placeholder="e.g. 5/2">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Returns (€ total back incl. stake) — if won</label>
+                <input type="number" id="waReturns" placeholder="e.g. 17.50" step="0.01" min="0">
+            </div>
+            <div class="form-row form-row-2 hidden" id="waSettledWeekGroup">
+                <div class="form-group">
+                    <label>Settled in week</label>
+                    <input type="number" id="waSettledWeek" min="1" placeholder="e.g. 3">
+                    <p style="font-size:0.78em;color:var(--text-light);margin-top:3px">Which week's leaderboard this result counts toward. Defaults to the submission week above.</p>
+                </div>
+            </div>
+            <button class="btn btn-gold" onclick="addWhatsAppBet()">➕ Add WhatsApp Bet</button>
+            <div id="waMsg" style="margin-top:10px"></div>
+        </div>
+    </div>
+</div>
 ══════════════════════════════════════ -->
 <div id="feedPage" class="container hidden">
     <div class="card">
@@ -852,10 +952,10 @@
         <h2>⚙️ Admin Panel</h2>
 
         <div class="queue-tabs" style="margin-bottom:20px" id="adminTabBar">
-            <div class="queue-tab active" onclick="showAdminTab('week')"   id="at-week">📅 Week</div>
-            <div class="queue-tab"        onclick="showAdminTab('users')"  id="at-users">👤 Users</div>
-            <div class="queue-tab"        onclick="showAdminTab('import')" id="at-import">📥 Import</div>
-            <div class="queue-tab"        onclick="showAdminTab('config')" id="at-config">🔧 Config</div>
+            <div class="queue-tab active" onclick="showAdminTab('week')"      id="at-week">📅 Week</div>
+            <div class="queue-tab"        onclick="showAdminTab('users')"     id="at-users">👤 Users</div>
+            <div class="queue-tab"        onclick="showAdminTab('import')"    id="at-import">📥 Import</div>
+            <div class="queue-tab"        onclick="showAdminTab('config')"    id="at-config">🔧 Config</div>
         </div>
 
         <!-- Week tab -->
@@ -1102,6 +1202,7 @@
             </div>
             <button class="btn" onclick="savePin()">Update PIN</button>
             <div id="pinMsgAdmin" style="margin-top:8px"></div>
+        </div>
         </div>
     </div>
 </div>
@@ -1668,6 +1769,14 @@ function renderDashboard() {
 //  SUBMIT BET
 // ══════════════════════════════════════════════════════════════
 function renderSubmit() {
+    if (isAdmin) {
+        document.getElementById('submitRegularForm').classList.add('hidden');
+        document.getElementById('submitAdminForm').classList.remove('hidden');
+        initWaTab();
+        return;
+    }
+    document.getElementById('submitRegularForm').classList.remove('hidden');
+    document.getElementById('submitAdminForm').classList.add('hidden');
     const balance = getUserBalance(currentUser);
     const el = document.getElementById('betBalanceInfo');
     const betsThisWeek = getUserBets(currentUser, currentWeek).filter(b => b.status !== 'void').length;
@@ -1680,6 +1789,7 @@ function renderSubmit() {
 }
 
 let currentInputMode = 'text';
+let waInputMode      = 'text';
 
 function setInputMode(mode) {
     currentInputMode = mode;
@@ -2789,8 +2899,8 @@ function showAdminTab(t) {
         document.getElementById('at-' + x)?.classList.toggle('active', x === t);
         document.getElementById('adminTab-' + x)?.classList.toggle('hidden', x !== t);
     });
-    if (t === 'users')  renderAdminUsers();
-    if (t === 'config') { renderAdminConfig(); renderAdminFreeBets(); renderFeatureToggles(); }
+    if (t === 'users')    renderAdminUsers();
+    if (t === 'config')   { renderAdminConfig(); renderAdminFreeBets(); renderFeatureToggles(); }
 }
 
 function renderAdmin() {
@@ -2830,8 +2940,8 @@ function renderAdmin() {
         pnlSel.dataset.populated = '1';
     }
 
-    if (adminTab === 'users')  renderAdminUsers();
-    if (adminTab === 'config') { renderAdminConfig(); renderAdminFreeBets(); renderFeatureToggles(); }
+    if (adminTab === 'users')    renderAdminUsers();
+    if (adminTab === 'config')   { renderAdminConfig(); renderAdminFreeBets(); renderFeatureToggles(); }
 }
 
 function getMemberActivityStatus(m) {
@@ -3609,6 +3719,203 @@ function copyShareMsg() {
         document.execCommand('copy'); document.body.removeChild(ta);
         confirm.textContent = '✅ Copied!';
     });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  WHATSAPP BETS TAB (admin)
+// ══════════════════════════════════════════════════════════════
+function initWaTab() {
+    const sel = document.getElementById('waMember');
+    if (sel && !sel.dataset.populated) {
+        ALL_USERS.forEach(m => {
+            const o = document.createElement('option');
+            o.value = o.textContent = m;
+            sel.appendChild(o);
+        });
+        sel.dataset.populated = '1';
+        document.getElementById('waWeek').value        = currentWeek;
+        document.getElementById('waSettledWeek').value = currentWeek;
+        updateWaRetroModeNote();
+    }
+}
+
+function setWaInputMode(mode) {
+    waInputMode = mode;
+    const isPhoto = mode === 'photo';
+    document.getElementById('waModeText').classList.toggle('hidden', isPhoto);
+    document.getElementById('waModePhoto').classList.toggle('hidden', !isPhoto);
+    const btnText  = document.getElementById('waToggleText');
+    const btnPhoto = document.getElementById('waTogglePhoto');
+    if (btnText && btnPhoto) {
+        btnText.style.background  = isPhoto ? '' : 'var(--navy-mid)';
+        btnText.style.color       = isPhoto ? '' : '#fff';
+        btnText.className         = isPhoto ? 'btn btn-sm btn-ghost' : 'btn btn-sm';
+        btnPhoto.style.background = isPhoto ? 'var(--navy-mid)' : '';
+        btnPhoto.style.color      = isPhoto ? '#fff' : '';
+        btnPhoto.className        = isPhoto ? 'btn btn-sm' : 'btn btn-sm btn-ghost';
+    }
+}
+
+function onWaScreenshotSelected(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById('waPreviewImg').src = e.target.result;
+        document.getElementById('waPreview').style.display = '';
+        document.getElementById('waDropText').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+}
+
+function updateWaRetroModeNote() {
+    const week = Number.parseInt(document.getElementById('waWeek')?.value);
+    const isCurrent = week === currentWeek;
+    document.getElementById('waCurrentWeekNote').style.display = isCurrent ? '' : 'none';
+    document.getElementById('waPastWeekNote').style.display    = (!Number.isNaN(week) && !isCurrent) ? '' : 'none';
+}
+
+function updateWaSettledWeekVisibility() {
+    const status = document.getElementById('waStatus')?.value;
+    const isSettled = status === 'won' || status === 'lost' || status === 'ew-place';
+    document.getElementById('waSettledWeekGroup')?.classList.toggle('hidden', !isSettled);
+}
+
+async function addWhatsAppBet() {
+    const msg = document.getElementById('waMsg');
+    msg.innerHTML = '';
+
+    let selection      = '';
+    let screenshotFile = null;
+
+    if (waInputMode === 'text') {
+        selection = document.getElementById('waSelection').value.trim();
+        if (!selection) { msg.innerHTML = '<div class="alert alert-error">Please enter a selection.</div>'; return; }
+    } else {
+        screenshotFile = document.getElementById('waScreenshot').files[0];
+        if (!screenshotFile) { msg.innerHTML = '<div class="alert alert-error">Please attach a screenshot.</div>'; return; }
+        selection = document.getElementById('waDescriptionPhoto').value.trim() || '(screenshot)';
+    }
+
+    const member         = document.getElementById('waMember').value;
+    const week           = Number.parseInt(document.getElementById('waWeek').value);
+    const stake          = Number.parseFloat(document.getElementById('waStake').value);
+    const type           = document.getElementById('waType').value;
+    const status         = document.getElementById('waStatus').value;
+    const odds           = document.getElementById('waOdds').value.trim();
+    const returns        = Number.parseFloat(document.getElementById('waReturns').value) || 0;
+    const settledWeekRaw = Number.parseInt(document.getElementById('waSettledWeek').value);
+
+    if (!week)                                       { msg.innerHTML = '<div class="alert alert-error">Please enter a week number.</div>'; return; }
+    if (!stake || Number.isNaN(stake) || stake <= 0) { msg.innerHTML = '<div class="alert alert-error">Please enter a valid stake.</div>'; return; }
+
+    msg.innerHTML = '<div class="alert" style="background:var(--card-bg2);color:var(--text-mid)">Saving…</div>';
+
+    let screenshotUrl      = null;
+    let screenshotPublicId = null;
+
+    if (screenshotFile) {
+        try {
+            const formData = new FormData();
+            formData.append('file', screenshotFile);
+            formData.append('upload_preset', CLOUDINARY_PRESET);
+            formData.append('folder', 'syndicate');
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            if (!res.ok) throw new Error('Upload failed');
+            const data = await res.json();
+            screenshotUrl      = data.secure_url;
+            screenshotPublicId = data.public_id;
+        } catch (e) {
+            msg.innerHTML = `<div class="alert alert-error">Screenshot upload failed: ${e.message}</div>`;
+            return;
+        }
+    }
+
+    const isCurrentWeek = week === currentWeek;
+    const betId         = db.ref('/bets').push().key;
+    const totalStake    = type === 'ew' ? stake * 2 : stake;
+    const isFbType      = type === 'freeBet';
+
+    let profit, savedStatus;
+    if (status === 'won') {
+        profit      = isFbType ? returns : returns - totalStake;
+        savedStatus = 'won';
+    } else if (status === 'ew-place') {
+        profit      = returns - totalStake;
+        savedStatus = profit >= 0 ? 'won' : 'lost';
+    } else if (status === 'lost') {
+        profit      = isFbType ? 0 : -totalStake;
+        savedStatus = 'lost';
+    } else {
+        profit      = null;
+        savedStatus = status;
+    }
+
+    const isSettled       = savedStatus === 'won' || savedStatus === 'lost';
+    const settledWeek     = isSettled ? (settledWeekRaw || week) : undefined;
+    const tokensDeducted  = isCurrentWeek && !isFbType ? Math.ceil(totalStake / BET_VALUE) : 0;
+
+    const bet = {
+        id: betId, user: member, selection, stake, type, status: savedStatus, week,
+        submittedAt: Date.now(), tokensDeducted, profit,
+        ...(savedStatus !== 'pending' ? { placedBy: currentUser, placedAt: Date.now(), oddsPlaced: odds } : {}),
+        ...(isSettled ? { settledAt: Date.now(), settledWeek } : {}),
+        ...(savedStatus === 'won' ? { returns } : {}),
+        ...(screenshotUrl ? { screenshotUrl, screenshotPublicId, hasScreenshot: true } : {})
+    };
+
+    const updates = { [`/bets/${betId}`]: bet };
+
+    if (isCurrentWeek) {
+        if (!isFbType && tokensDeducted > 0) {
+            updates[`/users/${member}/betBalance`] = Math.max(0, getUserBalance(member) - tokensDeducted);
+        }
+        if (!isFbType) {
+            const ppBalance = appData.config.ppBalance ?? PP_BALANCE_SEED;
+            updates['/config/ppBalance'] = Math.max(0, Math.round((ppBalance - totalStake) * 100) / 100);
+        }
+        if (isSettled) {
+            updates[`/users/${member}/totalPnl`] = Math.round((getAllTimePnl(member) + (profit || 0)) * 100) / 100;
+            if (savedStatus === 'won') {
+                updates[`/users/${member}/betsWon`] = (appData.users[member]?.betsWon || 0) + 1;
+                const bonus = isBigOdds(odds) ? 1 : 0;
+                const curBal = updates[`/users/${member}/betBalance`] ?? getUserBalance(member);
+                updates[`/users/${member}/betBalance`] = Math.min(MAX_CARRY, curBal + tokensDeducted + bonus);
+                if (!isFbType && returns > 0) {
+                    const ppNow = updates['/config/ppBalance'] ?? (appData.config.ppBalance ?? PP_BALANCE_SEED);
+                    updates['/config/ppBalance'] = Math.round((ppNow + returns) * 100) / 100;
+                }
+            }
+        }
+        updates[`/users/${member}/lastBetWeek`] = currentWeek;
+    } else if (isSettled) {
+        updates[`/users/${member}/totalPnl`] = Math.round((getAllTimePnl(member) + (profit || 0)) * 100) / 100;
+        if (savedStatus === 'won') {
+            updates[`/users/${member}/betsWon`] = (appData.users[member]?.betsWon || 0) + 1;
+        }
+    }
+
+    await db.ref('/').update(updates);
+
+    // Clear form
+    document.getElementById('waSelection').value        = '';
+    document.getElementById('waDescriptionPhoto').value = '';
+    document.getElementById('waScreenshot').value       = '';
+    document.getElementById('waPreview').style.display  = 'none';
+    document.getElementById('waDropText').style.display = '';
+    document.getElementById('waOdds').value             = '';
+    document.getElementById('waReturns').value          = '';
+    document.getElementById('waSettledWeek').value      = currentWeek;
+    setWaInputMode('text');
+
+    const modeLabel = isCurrentWeek ? ' (current week — balance deducted)' : ' (historical — no balance change)';
+    const weekNote  = settledWeek && settledWeek !== week ? `, settled Week ${settledWeek}` : '';
+    const ssNote    = screenshotUrl ? ' · 📸 screenshot attached' : '';
+    msg.innerHTML = `<div class="alert alert-success">WhatsApp bet added for ${esc(member)} — Week ${week}${weekNote}${modeLabel}${ssNote}.</div>`;
+    setTimeout(() => msg.innerHTML = '', 5000);
 }
 
 // ══════════════════════════════════════════════════════════════
